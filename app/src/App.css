@@ -180,16 +180,13 @@ button {
   height: 184px;
   display: grid;
   place-items: center;
-  border: 1px solid rgba(233, 211, 164, 0.28);
+  border: none;
   border-radius: 999px;
-  background: radial-gradient(circle, rgba(233, 211, 164, 0.2), rgba(92, 125, 108, 0.08) 58%, transparent 70%);
 }
 
-.session-orb span {
-  width: 88px;
-  height: 88px;
-  border-radius: inherit;
-  background: rgba(233, 211, 164, 0.14);
+.orb-ring {
+  width: 100%;
+  height: 100%;
 }
 
 .countdown {

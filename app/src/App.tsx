@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { DurationSelector, type DurationMinutes } from './components/DurationSelector'
+import { DurationSelector } from './components/DurationSelector'
+import type { DurationMinutes } from './components/duration'
 import { ModeSelector } from './components/ModeSelector'
 import { SessionView } from './components/SessionView'
 import type { Mode } from './types'

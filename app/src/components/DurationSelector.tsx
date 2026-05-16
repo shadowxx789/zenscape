@@ -1,5 +1,4 @@
-export const DURATIONS = [5, 10, 20, 30] as const
-export type DurationMinutes = (typeof DURATIONS)[number]
+import { DURATIONS, type DurationMinutes } from './duration'
 
 type DurationSelectorProps = {
   value: DurationMinutes
