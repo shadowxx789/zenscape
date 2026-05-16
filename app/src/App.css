@@ -1,0 +1,233 @@
+#root {
+  min-height: 100svh;
+}
+
+button {
+  font: inherit;
+}
+
+.home-view,
+.session-view {
+  width: min(100%, 560px);
+  min-height: 100svh;
+  margin: 0 auto;
+  padding: 32px 20px;
+  box-sizing: border-box;
+}
+
+.home-view {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.hero-panel,
+.selector-block,
+.session-view {
+  border: 1px solid var(--border);
+  background: linear-gradient(145deg, rgba(237, 211, 164, 0.1), rgba(255, 255, 255, 0.03));
+  border-radius: 28px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.22);
+}
+
+.hero-panel,
+.selector-block {
+  padding: 24px;
+}
+
+.section-kicker {
+  margin: 0 0 8px;
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.hero-panel h1,
+.session-view h1 {
+  margin: 0;
+  color: var(--text-h);
+  font-size: clamp(2.35rem, 11vw, 4.4rem);
+  line-height: 0.95;
+  letter-spacing: -0.08em;
+}
+
+.hero-copy,
+.session-copy {
+  margin: 16px 0 0;
+  color: var(--text);
+}
+
+.selector-block h2 {
+  margin: 0 0 16px;
+  color: var(--text-h);
+  font-size: 1.2rem;
+}
+
+.option-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.mode-grid {
+  grid-template-columns: 1fr;
+}
+
+.duration-grid {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.option-card,
+.duration-pill,
+.primary-action,
+.ghost-action,
+.start-button {
+  border: 1px solid var(--border);
+  color: var(--text-h);
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  transition: border-color 180ms ease, transform 180ms ease, background 180ms ease;
+}
+
+.option-card:hover,
+.duration-pill:hover,
+.primary-action:hover,
+.ghost-action:hover,
+.start-button:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent-border);
+}
+
+.option-card:focus-visible,
+.duration-pill:focus-visible,
+.primary-action:focus-visible,
+.ghost-action:focus-visible,
+.start-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.option-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 18px;
+  border-radius: 20px;
+  text-align: left;
+}
+
+.option-card span {
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.option-card small {
+  color: var(--text);
+  line-height: 1.45;
+}
+
+.duration-pill {
+  min-height: 72px;
+  border-radius: 20px;
+  font-size: 1.35rem;
+  font-weight: 800;
+}
+
+.duration-pill span {
+  display: block;
+  margin-top: 2px;
+  color: var(--text);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.is-selected {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+  box-shadow: inset 0 0 0 1px rgba(237, 211, 164, 0.16);
+}
+
+.start-button,
+.primary-action,
+.ghost-action {
+  min-height: 56px;
+  border-radius: 999px;
+  padding: 0 24px;
+  font-weight: 800;
+}
+
+.start-button,
+.primary-action {
+  border-color: transparent;
+  color: #14201d;
+  background: linear-gradient(135deg, #e9d3a4, #b9d8c2);
+}
+
+.session-view {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  text-align: center;
+}
+
+.session-orb {
+  width: 184px;
+  height: 184px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(233, 211, 164, 0.28);
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(233, 211, 164, 0.2), rgba(92, 125, 108, 0.08) 58%, transparent 70%);
+}
+
+.session-orb span {
+  width: 88px;
+  height: 88px;
+  border-radius: inherit;
+  background: rgba(233, 211, 164, 0.14);
+}
+
+.countdown {
+  margin: 10px 0;
+  color: var(--text-h);
+  font-size: clamp(4rem, 20vw, 7rem);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  letter-spacing: -0.08em;
+}
+
+.session-actions {
+  width: 100%;
+  display: grid;
+  gap: 12px;
+}
+
+.ghost-action {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+@media (min-width: 620px) {
+  .home-view,
+  .session-view {
+    padding: 48px 24px;
+  }
+
+  .mode-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .session-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 380px) {
+  .duration-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
