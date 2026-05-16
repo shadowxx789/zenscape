@@ -4,6 +4,7 @@ import type { SoundParams } from '../audio/soundParams'
 import { computeParams, getPhase, type Phase } from '../audio/rules'
 import type { Mode } from '../types'
 import { audioEngine } from '../audio/AudioEngine'
+import { ParticleCanvas } from './ParticleCanvas'
 
 type SessionViewProps = {
   mode: Mode
@@ -138,6 +139,7 @@ export function SessionView({ mode, duration, soundParams, onSoundParamsChange, 
 
   return (
     <main className="session-view" aria-label="声景会话">
+      <ParticleCanvas isPlaying={isPlaying} brightness={soundParams.brightness} />
       <div className="session-orb" aria-hidden="true">
         <svg viewBox="0 0 184 184" className="orb-ring">
           <circle cx="92" cy="92" r="90" fill="none" stroke="rgba(233,211,164,0.12)" strokeWidth="1" />
