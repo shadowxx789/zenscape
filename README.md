@@ -19,6 +19,8 @@
 
 声音会自己走。
 
+**→ [在线体验](https://shadowxx789.github.io/zenscape/)**
+
 ## 三个模式
 
 | 模式 | 意图 |
@@ -39,17 +41,29 @@
 
 每个声音层的音量、频率、空间位置都由规则引擎实时驱动，跟随会话阶段（入定 → 安住 → 深境 → 回转）缓慢变化。钟声和古琴由概率触发——你永远不知道下一响是什么时候。
 
+## 功能
+
+- **实时合成** — 全部声音由 Web Audio API 合成，无音频文件依赖
+- **三层混音** — 风声、水声、Drone 三层独立控制
+- **五维调节** — 主音量 / 自然声 / 乐器 / 空间感 / 明亮度
+- **概率事件** — 钟声、古琴随机触发，不循环、不重复
+- **阶段规则** — 四个会话阶段自动调整参数（入定 → 安住 → 深境 → 回转）
+- **粒子艺术** — 播放时温暖的数字粒子缓慢流动
+- **偏好持久** — 模式、时长、滑杆值自动保存到本地
+- **自定义时长** — 5 / 10 / 20 / 30 分钟或自定义
+
 ## 技术栈
 
 ```
-React 19 + TypeScript 6
+React 19 + TypeScript
 Vite 8
 Web Audio API
+Canvas 2D (粒子)
 localStorage
 无后端，无账号，无依赖
 ```
 
-目标：Web / PWA，纯静态部署。
+Web / PWA，纯静态部署。
 
 ## 项目结构
 
@@ -60,15 +74,24 @@ zenscape/
   TASKS.md              — 里程碑任务拆分
   app/
     src/
-      audio/            — 音频引擎（Web Audio API）
-      components/       — React 组件
-      store/            — 状态管理
-      utils/            — 工具函数
-      types.ts          — 类型定义
+      audio/
+        AudioEngine.ts  — 音频引擎（风/水/Drone 三层 + 总线淡入）
+        OneShotPlayer.ts — 钟声/古琴合成
+        scheduler.ts    — 概率触发调度器
+        rules.ts        — 会话阶段规则引擎
+        soundParams.ts  — 声音参数类型
+      components/
+        ParticleCanvas.tsx — 禅意粒子艺术
+        SessionView.tsx    — 会话页（倒计时 + 粒子 + 滑杆）
+        ModeSelector.tsx   — 模式选择
+        DurationSelector.tsx — 时长选择
+        SoundControls.tsx  — 声音控制滑杆
+      storage/
+        preferenceStore.ts — 本地偏好持久化
       App.tsx           — 主应用
-      App.css           — 样式（深色禅意主题）
+      App.css           — 深色禅意主题
     public/
-      audio/            — 音频素材（风 / 水 / 钟 / 古琴）
+      favicon.svg       — 禅意光圈图标
 ```
 
 ## 设计原则
@@ -89,11 +112,26 @@ npm run dev
 
 ## 部署
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/shadowxx789/zenscape&root-directory=app)
+```bash
+cd app
+npm run build
+# dist/ 目录可部署到任意静态托管
+```
 
-## 当前状态
+已部署到 GitHub Pages：[shadowxx789.github.io/zenscape](https://shadowxx789.github.io/zenscape/)
 
-M0 阶段：项目骨架已搭建，首页 UI 可交互，音频引擎尚未接入。
+## 里程碑
+
+| 阶段 | 内容 | 状态 |
+|------|------|------|
+| M0 | 项目搭建、静态 UI、倒计时 | ✅ |
+| M1 | AudioEngine 风声合成 | ✅ |
+| M2 | 多层混音 + 滑杆 + 自定义时长 | ✅ |
+| M3 | 钟声/古琴概率触发 | ✅ |
+| M4 | 会话阶段规则引擎 | ✅ |
+| M5 | 本地偏好持久化 | ✅ |
+| M6 | 禅意粒子艺术 | ✅ |
+| M7 | 测试 + 部署 | ✅ |
 
 ## 开源协议
 
