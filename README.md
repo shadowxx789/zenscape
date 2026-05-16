@@ -87,9 +87,17 @@ npm install
 npm run dev
 ```
 
+## 部署
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/shadowxx789/zenscape&root-directory=app)
+
 ## 当前状态
 
 M0 阶段：项目骨架已搭建，首页 UI 可交互，音频引擎尚未接入。
+
+## 开源协议
+
+MIT License — 自由使用，自由修改，自由分发。
 
 ---
 
