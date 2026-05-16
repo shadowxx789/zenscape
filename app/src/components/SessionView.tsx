@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { MODE_DETAILS } from './ModeSelector'
-import type { DurationMinutes } from './duration'
+import type { SoundParams } from '../audio/soundParams'
 import type { Mode } from '../types'
 import { audioEngine } from '../audio/AudioEngine'
 
 type SessionViewProps = {
   mode: Mode
-  duration: DurationMinutes
+  duration: number
+  soundParams: SoundParams
+  onSoundParamsChange: (params: SoundParams) => void
   onReturn: () => void
 }
 
@@ -16,7 +18,7 @@ function formatTime(totalSeconds: number) {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
-export function SessionView({ mode, duration, onReturn }: SessionViewProps) {
+export function SessionView({ mode, duration, soundParams, onSoundParamsChange, onReturn }: SessionViewProps) {
   const totalSeconds = duration * 60
   const [remaining, setRemaining] = useState(totalSeconds)
   const [isPlaying, setIsPlaying] = useState(false)
@@ -30,7 +32,7 @@ export function SessionView({ mode, duration, onReturn }: SessionViewProps) {
     }
   }, [])
 
-  // 倒计时逻辑
+  // 倒计时
   useEffect(() => {
     if (isPlaying && remaining > 0) {
       intervalRef.current = setInterval(() => {
@@ -39,7 +41,7 @@ export function SessionView({ mode, duration, onReturn }: SessionViewProps) {
             clearTimer()
             setIsPlaying(false)
             setIsFinished(true)
-            audioEngine.stop() // 时间到，淡出
+            audioEngine.stop()
             return 0
           }
           return prev - 1
@@ -49,22 +51,28 @@ export function SessionView({ mode, duration, onReturn }: SessionViewProps) {
     return clearTimer
   }, [isPlaying, clearTimer, remaining])
 
-  // 组件卸载时清理音频
+  // 卸载清理
   useEffect(() => {
-    return () => {
-      audioEngine.stopImmediate()
-    }
+    return () => { audioEngine.stopImmediate() }
   }, [])
+
+  // 参数实时同步到 engine
+  useEffect(() => {
+    audioEngine.setMasterVolume(soundParams.masterVolume)
+    audioEngine.setNatureLevel(soundParams.natureLevel)
+    audioEngine.setInstrumentLevel(soundParams.instrumentLevel)
+    audioEngine.setSpatialLevel(soundParams.spatialLevel)
+    audioEngine.setBrightness(soundParams.brightness)
+  }, [soundParams])
 
   const handlePlayPause = async () => {
     if (isFinished) return
-
     if (isPlaying) {
       setIsPlaying(false)
-      audioEngine.stop() // 3 秒淡出
+      audioEngine.stop()
     } else {
       setIsPlaying(true)
-      await audioEngine.play() // 3 秒淡入
+      await audioEngine.play()
     }
   }
 
@@ -80,18 +88,17 @@ export function SessionView({ mode, duration, onReturn }: SessionViewProps) {
     setIsPlaying(false)
   }
 
+  const handleParamChange = (key: keyof SoundParams, value: number) => {
+    onSoundParamsChange({ ...soundParams, [key]: value })
+  }
+
   const progress = 1 - remaining / totalSeconds
 
   return (
     <main className="session-view" aria-label="声景会话">
       <div className="session-orb" aria-hidden="true">
         <svg viewBox="0 0 184 184" className="orb-ring">
-          <circle
-            cx="92" cy="92" r="90"
-            fill="none"
-            stroke="rgba(233,211,164,0.12)"
-            strokeWidth="1"
-          />
+          <circle cx="92" cy="92" r="90" fill="none" stroke="rgba(233,211,164,0.12)" strokeWidth="1" />
           <circle
             cx="92" cy="92" r="90"
             fill="none"
@@ -121,29 +128,44 @@ export function SessionView({ mode, duration, onReturn }: SessionViewProps) {
         {formatTime(remaining)}
       </div>
 
+      {/* 会话中的迷你滑杆 */}
+      {isPlaying && !isFinished && (
+        <div className="session-sliders">
+          {([
+            ['masterVolume', '音量'],
+            ['natureLevel', '自然'],
+            ['instrumentLevel', '乐器'],
+            ['brightness', '明亮'],
+          ] as const).map(([key, label]) => (
+            <div key={key} className="session-slider-row">
+              <label htmlFor={`ss-${key}`} className="session-slider-label">{label}</label>
+              <input
+                id={`ss-${key}`}
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={soundParams[key]}
+                onChange={(e) => handleParamChange(key, Number(e.target.value))}
+                className="zen-slider zen-slider--sm"
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="session-actions">
         {isFinished ? (
           <>
-            <button type="button" className="primary-action" onClick={handleRestart}>
-              再来一次
-            </button>
-            <button type="button" className="ghost-action" onClick={handleReturn}>
-              返回首页
-            </button>
+            <button type="button" className="primary-action" onClick={handleRestart}>再来一次</button>
+            <button type="button" className="ghost-action" onClick={handleReturn}>返回首页</button>
           </>
         ) : (
           <>
-            <button
-              type="button"
-              className="primary-action"
-              onClick={handlePlayPause}
-              aria-pressed={isPlaying}
-            >
+            <button type="button" className="primary-action" onClick={handlePlayPause} aria-pressed={isPlaying}>
               {isPlaying ? '暂停' : '播放'}
             </button>
-            <button type="button" className="ghost-action" onClick={handleReturn}>
-              返回首页
-            </button>
+            <button type="button" className="ghost-action" onClick={handleReturn}>返回首页</button>
           </>
         )}
       </div>

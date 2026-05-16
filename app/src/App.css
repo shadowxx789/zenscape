@@ -228,3 +228,141 @@ button {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* — Slider Controls — */
+
+.slider-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.slider-row {
+  display: grid;
+  grid-template-columns: 56px 1fr 36px;
+  align-items: center;
+  gap: 10px;
+}
+
+.slider-label {
+  font-size: 0.82rem;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.slider-value {
+  font-size: 0.78rem;
+  color: var(--accent);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.zen-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(233, 211, 164, 0.18);
+  outline: none;
+  cursor: pointer;
+}
+
+.zen-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: none;
+  cursor: pointer;
+  transition: transform 120ms ease;
+}
+
+.zen-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.zen-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: none;
+  cursor: pointer;
+}
+
+/* — Custom Duration Pill — */
+
+.duration-pill--custom {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.duration-pill.is-editing {
+  padding: 8px;
+}
+
+.custom-duration-form {
+  width: 100%;
+}
+
+.custom-duration-input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-h);
+  font: inherit;
+  font-size: 1.2rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.custom-duration-input::placeholder {
+  color: var(--text);
+  font-weight: 400;
+}
+
+/* — Session Mini Sliders — */
+
+.session-sliders {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 16px;
+}
+
+.session-slider-row {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  align-items: center;
+  gap: 8px;
+}
+
+.session-slider-label {
+  font-size: 0.72rem;
+  color: var(--text);
+}
+
+.zen-slider--sm {
+  height: 3px;
+}
+
+.zen-slider--sm::-webkit-slider-thumb {
+  width: 12px;
+  height: 12px;
+}
+
+.zen-slider--sm::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+}
+
+@media (max-width: 380px) {
+  .session-sliders {
+    grid-template-columns: 1fr;
+  }
+}
