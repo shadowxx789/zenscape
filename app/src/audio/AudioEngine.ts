@@ -232,7 +232,8 @@ export class AudioEngine {
     source.connect(filter)
     filter.connect(gain)
     gain.connect(this.masterGain!)
-    source.start(now)
+    // 源延后 50ms 启动，确保增益已经在 0 位
+    source.start(now + 0.05)
 
     this.layers.set(name, { source, filter, gain })
   }
@@ -260,7 +261,7 @@ export class AudioEngine {
     osc.connect(filter)
     filter.connect(gain)
     gain.connect(this.masterGain!)
-    osc.start(now)
+    osc.start(now + 0.05) // 延后启动
 
     this.layers.set(name, { source: osc, filter, gain })
   }

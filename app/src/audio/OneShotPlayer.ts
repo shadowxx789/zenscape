@@ -103,16 +103,17 @@ export class OneShotPlayer {
     osc.frequency.value = freq
 
     const gain = ctx.createGain()
-    // 关键：从 0 线性渐起，不用 exponentialRamp 做 attack
+    // 从 0 线性渐起，源延后启动避免 click
     gain.gain.setValueAtTime(0, now)
-    gain.gain.linearRampToValueAtTime(volume, now + 0.3)
+    gain.gain.setValueAtTime(0, now + 0.05)
+    gain.gain.linearRampToValueAtTime(volume, now + 0.05 + 0.3)
     // 峰值后指数衰减
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.3 + decay)
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.05 + 0.3 + decay)
 
     osc.connect(gain)
     gain.connect(dest)
-    osc.start(now)
-    osc.stop(now + 0.3 + decay + 0.1)
+    osc.start(now + 0.05)
+    osc.stop(now + 0.05 + 0.3 + decay + 0.1)
   }
 
   /**
@@ -134,16 +135,16 @@ export class OneShotPlayer {
 
     const gain = ctx.createGain()
     gain.gain.setValueAtTime(0, now)
-    gain.gain.setValueAtTime(0, now + 0.02)
-    gain.gain.linearRampToValueAtTime(volume, now + 0.02 + 0.3)
+    gain.gain.setValueAtTime(0, now + 0.05)
+    gain.gain.linearRampToValueAtTime(volume, now + 0.05 + 0.3)
     // 峰值后先保持一会儿再衰减
-    gain.gain.setValueAtTime(volume, now + 0.02 + 0.5)
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.02 + 0.5 + decay)
+    gain.gain.setValueAtTime(volume, now + 0.05 + 0.5)
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.05 + 0.5 + decay)
 
     osc.connect(gain)
     gain.connect(dest)
-    osc.start(now)
-    osc.stop(now + 0.02 + 0.5 + decay + 0.1)
+    osc.start(now + 0.05)
+    osc.stop(now + 0.05 + 0.5 + decay + 0.1)
   }
 }
 
