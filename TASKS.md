@@ -32,12 +32,12 @@
 验收：拖动滑杆声音平滑变化，无爆音。
 
 ## M3 一次性事件与调度器
-- [ ] 实现 OneShotPlayer。
-- [ ] 实现 `scheduler.ts`，每 5 秒 tick。
-- [ ] 根据 `density`、`bellProbability`、`pluckProbability` 触发事件。
-- [ ] 支持最小事件间隔。
-- [ ] 随机音量、声像、采样选择。
-- [ ] 暂停时调度停止，继续时恢复。
+- [x] 实现 OneShotPlayer。
+- [x] 实现 `scheduler.ts`，每 5 秒 tick。
+- [x] 根据 `density`、`bellProbability`、`pluckProbability` 触发事件。
+- [x] 支持最小事件间隔。
+- [x] 随机音量、声像、采样选择。
+- [x] 暂停时调度停止，继续时恢复。
 
 验收：钟声/古琴偶尔出现，不是固定循环；连续 10 分钟无明显机械感。
 

@@ -1,16 +1,15 @@
 /**
- * AudioEngine — ZenScape M2
+ * AudioEngine — ZenScape M3
  *
- * 多层混音架构：
+ * 多层混音 + 概率事件调度：
  * - 风（white noise + bandpass）
  * - 水（white noise + high bandpass）
  * - Drone（低频 oscillator + slight modulation）
- *
- * 每层独立 GainNode → masterGain → destination
- * brightness 控制滤波器频率
- * natureLevel 联动风 + 水
- * instrumentLevel 控制 drone
+ * - 钟声/古琴（OneShotPlayer + Scheduler 概率触发）
  */
+
+import { OneShotPlayer } from './OneShotPlayer'
+import { Scheduler, type SchedulerParams } from './scheduler'
 
 const FADE_DURATION = 3
 const BUFFER_SECONDS = 8
@@ -22,7 +21,6 @@ interface LayerConfig {
   filterQ: number
   filterType: BiquadFilterType
   defaultGain: number
-  // oscillator 专用
   oscFreq?: number
   oscType?: OscillatorType
 }
@@ -53,7 +51,6 @@ const LAYER_CONFIGS: Record<string, LayerConfig> = {
   },
 }
 
-// 运行中的层节点
 interface ActiveLayer {
   source: AudioBufferSourceNode | OscillatorNode
   filter: BiquadFilterNode
@@ -69,14 +66,17 @@ export class AudioEngine {
   private _playing = false
   private _fading = false
 
-  // 缓存
   private _noiseBuffer: AudioBuffer | null = null
 
-  // drone LFO 节点（需要单独清理）
+  // drone LFO
   private droneLfo: OscillatorNode | null = null
   private droneLfoGain: GainNode | null = null
 
-  // 当前参数值
+  // 一次性事件（M3）
+  private oneShotPlayer: OneShotPlayer | null = null
+  private scheduler: Scheduler | null = null
+
+  // 参数
   private _masterVolume = 0.6
   private _brightness = 0.5
   private _natureLevel = 0.7
@@ -85,7 +85,6 @@ export class AudioEngine {
 
   get playing() { return this._playing }
 
-  /** 初始化 AudioContext（必须在用户手势回调中调用） */
   init(): void {
     if (this.ctx) return
     this.ctx = new AudioContext()
@@ -108,20 +107,17 @@ export class AudioEngine {
     }
   }
 
-  /** natureLevel 联动 wind + water 层音量 */
   setNatureLevel(value: number): void {
     this._natureLevel = clamp(value)
     this.applyLayerGain('wind', this._natureLevel)
     this.applyLayerGain('water', this._natureLevel)
   }
 
-  /** instrumentLevel 控制 drone 层音量 */
   setInstrumentLevel(value: number): void {
     this._instrumentLevel = clamp(value)
     this.applyLayerGain('drone', this._instrumentLevel)
   }
 
-  /** brightness 控制所有层的滤波器频率 */
   setBrightness(value: number): void {
     this._brightness = clamp(value)
     if (!this.ctx) return
@@ -133,9 +129,13 @@ export class AudioEngine {
     }
   }
 
-  /** spatial（预留接口，M3 可接入 reverb） */
   setSpatialLevel(value: number): void {
     this._spatialLevel = clamp(value)
+  }
+
+  /** 更新调度器参数（钟声/古琴概率） */
+  setSchedulerParams(params: Partial<SchedulerParams>): void {
+    this.scheduler?.setParams(params)
   }
 
   // — 播放控制 —
@@ -147,14 +147,20 @@ export class AudioEngine {
     const ctx = this.ctx!
     const now = ctx.currentTime
 
-    // 风
     this.createNoiseLayer('wind', now)
-    // 水
     this.createNoiseLayer('water', now)
-    // Drone
     this.createDroneLayer('drone', now)
 
     this._playing = true
+
+    // M3：启动调度器
+    if (!this.oneShotPlayer) {
+      this.oneShotPlayer = new OneShotPlayer(ctx, this.masterGain!)
+    }
+    if (!this.scheduler) {
+      this.scheduler = new Scheduler(this.oneShotPlayer)
+    }
+    this.scheduler.start()
   }
 
   async stop(): Promise<void> {
@@ -182,6 +188,7 @@ export class AudioEngine {
   }
 
   stopImmediate(): void {
+    this.scheduler?.stop()
     for (const [, layer] of this.layers) {
       try { layer.source.stop() } catch { /* already stopped */ }
       layer.source.disconnect()
@@ -200,6 +207,9 @@ export class AudioEngine {
   dispose(): void {
     this.stopImmediate()
     this._noiseBuffer = null
+    this.scheduler?.stop()
+    this.scheduler = null
+    this.oneShotPlayer = null
     this.masterGain?.disconnect()
     this.masterGain = null
     this.ctx?.close()
@@ -238,17 +248,15 @@ export class AudioEngine {
     const ctx = this.ctx!
     const config = LAYER_CONFIGS.drone
 
-    // 主 oscillator
     const osc = ctx.createOscillator()
     osc.type = config.oscType!
     osc.frequency.value = config.oscFreq!
 
-    // 轻微 LFM 调制，让 drone 不那么死板
     const lfo = ctx.createOscillator()
     lfo.type = 'sine'
-    lfo.frequency.value = 0.3 // 很慢的调制
+    lfo.frequency.value = 0.3
     const lfoGain = ctx.createGain()
-    lfoGain.gain.value = 3 // 调制幅度 ±3Hz
+    lfoGain.gain.value = 3
     lfo.connect(lfoGain)
     lfoGain.connect(osc.frequency)
     lfo.start(now)
@@ -288,11 +296,10 @@ export class AudioEngine {
     const buffer = ctx.createBuffer(1, length, sr)
     const data = buffer.getChannelData(0)
 
-    // 白噪声 + 移动平均柔化
     const raw = new Float32Array(length)
     for (let i = 0; i < length; i++) raw[i] = Math.random() * 2 - 1
 
-    const win = Math.floor(sr * 0.015) // 15ms 窗口
+    const win = Math.floor(sr * 0.015)
     let sum = 0
     for (let i = 0; i < length; i++) {
       sum += raw[i]
@@ -311,7 +318,6 @@ function clamp(v: number): number {
   return Math.max(0, Math.min(1, v))
 }
 
-/** brightness (0-1) 映射到滤波器频率：基准值的 0.3x ~ 2.5x */
 function mapBrightness(brightness: number, baseFreq: number): number {
   return baseFreq * (0.3 + brightness * 2.2)
 }
