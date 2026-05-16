@@ -134,15 +134,16 @@ export class OneShotPlayer {
 
     const gain = ctx.createGain()
     gain.gain.setValueAtTime(0, now)
-    gain.gain.linearRampToValueAtTime(volume, now + 0.3)
+    gain.gain.setValueAtTime(0, now + 0.02)
+    gain.gain.linearRampToValueAtTime(volume, now + 0.02 + 0.3)
     // 峰值后先保持一会儿再衰减
-    gain.gain.setValueAtTime(volume, now + 0.5)
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.5 + decay)
+    gain.gain.setValueAtTime(volume, now + 0.02 + 0.5)
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.02 + 0.5 + decay)
 
     osc.connect(gain)
     gain.connect(dest)
     osc.start(now)
-    osc.stop(now + 0.5 + decay + 0.1)
+    osc.stop(now + 0.02 + 0.5 + decay + 0.1)
   }
 }
 

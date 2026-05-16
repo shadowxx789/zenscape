@@ -224,9 +224,10 @@ export class AudioEngine {
 
     const gain = ctx.createGain()
     const layerGain = name === 'wind' ? this._natureLevel : this._natureLevel * 0.7
-    // 从 0 线性渐起，不用 exponentialRamp（避免 click）
+    // 保持 20ms 静默，让源稳定后再渐起（彻底消除启动 click）
     gain.gain.setValueAtTime(0, now)
-    gain.gain.linearRampToValueAtTime(layerGain, now + FADE_DURATION)
+    gain.gain.setValueAtTime(0, now + 0.02)
+    gain.gain.linearRampToValueAtTime(layerGain, now + 0.02 + FADE_DURATION)
 
     source.connect(filter)
     filter.connect(gain)
@@ -248,12 +249,13 @@ export class AudioEngine {
 
     const filter = ctx.createBiquadFilter()
     filter.type = config.filterType
-    filter.frequency.value = mapBrightness(this._brightness, config.filterFreq) * 0.6 // 压得更暗
+    filter.frequency.value = mapBrightness(this._brightness, config.filterFreq) * 0.3 // 非常暗
     filter.Q.value = config.filterQ
 
     const gain = ctx.createGain()
     gain.gain.setValueAtTime(0, now)
-    gain.gain.linearRampToValueAtTime(this._instrumentLevel * 0.5, now + FADE_DURATION)
+    gain.gain.setValueAtTime(0, now + 0.02)
+    gain.gain.linearRampToValueAtTime(this._instrumentLevel * 0.25, now + 0.02 + FADE_DURATION) // 音量再减半
 
     osc.connect(filter)
     filter.connect(gain)
