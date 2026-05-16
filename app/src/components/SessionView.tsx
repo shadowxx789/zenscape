@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { MODE_DETAILS } from './ModeSelector'
 import type { DurationMinutes } from './duration'
 import type { Mode } from '../types'
+import { audioEngine } from '../audio/AudioEngine'
 
 type SessionViewProps = {
   mode: Mode
@@ -29,6 +30,7 @@ export function SessionView({ mode, duration, onReturn }: SessionViewProps) {
     }
   }, [])
 
+  // 倒计时逻辑
   useEffect(() => {
     if (isPlaying && remaining > 0) {
       intervalRef.current = setInterval(() => {
@@ -37,6 +39,7 @@ export function SessionView({ mode, duration, onReturn }: SessionViewProps) {
             clearTimer()
             setIsPlaying(false)
             setIsFinished(true)
+            audioEngine.stop() // 时间到，淡出
             return 0
           }
           return prev - 1
@@ -46,9 +49,35 @@ export function SessionView({ mode, duration, onReturn }: SessionViewProps) {
     return clearTimer
   }, [isPlaying, clearTimer, remaining])
 
-  const handlePlayPause = () => {
+  // 组件卸载时清理音频
+  useEffect(() => {
+    return () => {
+      audioEngine.stopImmediate()
+    }
+  }, [])
+
+  const handlePlayPause = async () => {
     if (isFinished) return
-    setIsPlaying((p) => !p)
+
+    if (isPlaying) {
+      setIsPlaying(false)
+      audioEngine.stop() // 3 秒淡出
+    } else {
+      setIsPlaying(true)
+      await audioEngine.play() // 3 秒淡入
+    }
+  }
+
+  const handleReturn = () => {
+    audioEngine.stopImmediate()
+    onReturn()
+  }
+
+  const handleRestart = () => {
+    audioEngine.stopImmediate()
+    setRemaining(totalSeconds)
+    setIsFinished(false)
+    setIsPlaying(false)
   }
 
   const progress = 1 - remaining / totalSeconds
@@ -82,33 +111,23 @@ export function SessionView({ mode, duration, onReturn }: SessionViewProps) {
 
       {isFinished ? (
         <p className="session-copy">一段声景结束了。</p>
+      ) : isPlaying ? (
+        <p className="session-copy">风从竹林来。</p>
       ) : (
-        <p className="session-copy">
-          {isPlaying ? '声音接入中，此处先留白。' : '音频引擎尚未接入。此处先保留仪式感。'}
-        </p>
+        <p className="session-copy">点击播放，让声音慢慢醒来。</p>
       )}
 
-      <div
-        className="countdown"
-        aria-label={`倒计时 ${formatTime(remaining)}`}
-      >
+      <div className="countdown" aria-label={`倒计时 ${formatTime(remaining)}`}>
         {formatTime(remaining)}
       </div>
 
       <div className="session-actions">
         {isFinished ? (
           <>
-            <button
-              type="button"
-              className="primary-action"
-              onClick={() => {
-                setRemaining(totalSeconds)
-                setIsFinished(false)
-              }}
-            >
+            <button type="button" className="primary-action" onClick={handleRestart}>
               再来一次
             </button>
-            <button type="button" className="ghost-action" onClick={onReturn}>
+            <button type="button" className="ghost-action" onClick={handleReturn}>
               返回首页
             </button>
           </>
@@ -122,7 +141,7 @@ export function SessionView({ mode, duration, onReturn }: SessionViewProps) {
             >
               {isPlaying ? '暂停' : '播放'}
             </button>
-            <button type="button" className="ghost-action" onClick={onReturn}>
+            <button type="button" className="ghost-action" onClick={handleReturn}>
               返回首页
             </button>
           </>

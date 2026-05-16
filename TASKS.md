@@ -12,12 +12,12 @@
 验收：点击“开始”能进入会话页；页面可运行；先不接音频。
 
 ## M1 AudioEngine 最小可用版
-- [ ] 创建 `src/audio/AudioEngine.ts`。
-- [ ] 实现 `init()`、`playLoop(url)`、`stopAll()`、`setMasterVolume()`。
-- [ ] 用户点击后创建 AudioContext。
-- [ ] 播放一个风声音频 loop。
-- [ ] 实现 3 秒淡入、3 秒淡出。
-- [ ] 防止重复点击造成多个 loop 叠加。
+- [x] 创建 `src/audio/AudioEngine.ts`。
+- [x] 实现 `init()`、`playLoop(url)`、`stopAll()`、`setMasterVolume()`。
+- [x] 用户点击后创建 AudioContext。
+- [x] 播放一个风声音频 loop。
+- [x] 实现 3 秒淡入、3 秒淡出。
+- [x] 防止重复点击造成多个 loop 叠加。
 
 验收：点击播放能听到风声；暂停平滑淡出；反复播放/暂停不会叠声。
 
