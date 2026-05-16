@@ -135,6 +135,7 @@ export function SessionView({ mode, duration, soundParams, onSoundParamsChange, 
             ['masterVolume', '音量'],
             ['natureLevel', '自然'],
             ['instrumentLevel', '乐器'],
+            ['spatialLevel', '空间'],
             ['brightness', '明亮'],
           ] as const).map(([key, label]) => (
             <div key={key} className="session-slider-row">

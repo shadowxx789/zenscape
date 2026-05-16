@@ -68,10 +68,6 @@ export class AudioEngine {
 
   private _noiseBuffer: AudioBuffer | null = null
 
-  // drone LFO
-  private droneLfo: OscillatorNode | null = null
-  private droneLfoGain: GainNode | null = null
-
   // 一次性事件（M3）
   private oneShotPlayer: OneShotPlayer | null = null
   private scheduler: Scheduler | null = null
@@ -196,11 +192,6 @@ export class AudioEngine {
       layer.gain.disconnect()
     }
     this.layers.clear()
-    try { this.droneLfo?.stop() } catch { /* already stopped */ }
-    this.droneLfo?.disconnect()
-    this.droneLfoGain?.disconnect()
-    this.droneLfo = null
-    this.droneLfoGain = null
     this._playing = false
   }
 
@@ -249,26 +240,19 @@ export class AudioEngine {
     const config = LAYER_CONFIGS.drone
 
     const osc = ctx.createOscillator()
-    osc.type = config.oscType!
+    osc.type = 'triangle' // triangle 比 sine 更柔
     osc.frequency.value = config.oscFreq!
 
-    const lfo = ctx.createOscillator()
-    lfo.type = 'sine'
-    lfo.frequency.value = 0.3
-    const lfoGain = ctx.createGain()
-    lfoGain.gain.value = 3
-    lfo.connect(lfoGain)
-    lfoGain.connect(osc.frequency)
-    lfo.start(now)
+    // 去掉 LFO 调制，避免呜呜声
 
     const filter = ctx.createBiquadFilter()
     filter.type = config.filterType
-    filter.frequency.value = mapBrightness(this._brightness, config.filterFreq)
+    filter.frequency.value = mapBrightness(this._brightness, config.filterFreq) * 0.6 // 压得更暗
     filter.Q.value = config.filterQ
 
     const gain = ctx.createGain()
     gain.gain.setValueAtTime(0.001, now)
-    gain.gain.exponentialRampToValueAtTime(this._instrumentLevel, now + FADE_DURATION)
+    gain.gain.exponentialRampToValueAtTime(this._instrumentLevel * 0.5, now + FADE_DURATION) // 音量减半
 
     osc.connect(filter)
     filter.connect(gain)
@@ -276,8 +260,6 @@ export class AudioEngine {
     osc.start(now)
 
     this.layers.set(name, { source: osc, filter, gain })
-    this.droneLfo = lfo
-    this.droneLfoGain = lfoGain
   }
 
   // — 内部：工具 —
@@ -296,15 +278,23 @@ export class AudioEngine {
     const buffer = ctx.createBuffer(1, length, sr)
     const data = buffer.getChannelData(0)
 
+    // 生成原始白噪声
     const raw = new Float32Array(length)
     for (let i = 0; i < length; i++) raw[i] = Math.random() * 2 - 1
 
-    const win = Math.floor(sr * 0.015)
+    // 循环移动平均：窗口跨过 buffer 末尾时从头继续取
+    // 这样循环播放时首尾完全连续，不会产生 click
+    const win = Math.floor(sr * 0.015) // 15ms 窗口
     let sum = 0
+    // 先算第一个点的窗口和（循环取）
+    for (let j = 0; j < win; j++) {
+      sum += raw[j % length]
+    }
     for (let i = 0; i < length; i++) {
-      sum += raw[i]
-      if (i >= win) sum -= raw[i - win]
-      data[i] = sum / Math.min(i + 1, win)
+      data[i] = sum / win
+      // 滑动：去掉窗口左端，加上窗口右端（循环索引）
+      sum -= raw[i]
+      sum += raw[(i + win) % length]
     }
 
     this._noiseBuffer = buffer
