@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { MODE_DETAILS } from './ModeSelector'
 import type { SoundParams } from '../audio/soundParams'
+import { computeParams, getPhase, type Phase } from '../audio/rules'
 import type { Mode } from '../types'
 import { audioEngine } from '../audio/AudioEngine'
 
@@ -56,6 +57,24 @@ export function SessionView({ mode, duration, soundParams, onSoundParamsChange, 
     return () => { audioEngine.stopImmediate() }
   }, [])
 
+  // M4：规则引擎——每 4 秒根据进度重新计算参数
+  useEffect(() => {
+    if (!isPlaying || isFinished) return
+
+    const tick = () => {
+      const progress = 1 - remaining / totalSeconds
+      const hour = new Date().getHours()
+      const output = computeParams(mode, progress, {}, hour)
+      onSoundParamsChange(output.soundParams)
+      audioEngine.setSchedulerParams(output.schedulerParams)
+    }
+
+    // 立即算一次
+    tick()
+    const timer = setInterval(tick, 4000)
+    return () => clearInterval(timer)
+  }, [isPlaying, isFinished, remaining, totalSeconds, mode, onSoundParamsChange])
+
   // 参数实时同步到 engine
   useEffect(() => {
     audioEngine.setMasterVolume(soundParams.masterVolume)
@@ -93,6 +112,13 @@ export function SessionView({ mode, duration, soundParams, onSoundParamsChange, 
   }
 
   const progress = 1 - remaining / totalSeconds
+  const currentPhase: Phase = getPhase(progress)
+  const phaseLabel: Record<Phase, string> = {
+    entering: '入定',
+    settling: '安住',
+    deep: '深境',
+    returning: '回转',
+  }
 
   return (
     <main className="session-view" aria-label="声景会话">
@@ -113,7 +139,7 @@ export function SessionView({ mode, duration, soundParams, onSoundParamsChange, 
         </svg>
       </div>
 
-      <p className="section-kicker">Session</p>
+      <p className="section-kicker">Session · {phaseLabel[currentPhase]}</p>
       <h1>{MODE_DETAILS[mode].label}</h1>
 
       {isFinished ? (

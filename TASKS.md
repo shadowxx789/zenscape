@@ -42,12 +42,12 @@
 验收：钟声/古琴偶尔出现，不是固定循环；连续 10 分钟无明显机械感。
 
 ## M4 会话阶段与规则引擎
-- [ ] 实现 `getPhase(progress)`。
-- [ ] 实现 `getModeBaseParams(mode)`。
-- [ ] 实现 `applyPhaseRules`。
-- [ ] 实现 `applyTimeRules`。
-- [ ] 实现 `mapStateToSoundParams(state, preference, hour)`。
-- [ ] 每 3-5 秒重新计算 SoundParams 并推给 AudioEngine。
+- [x] 实现 `getPhase(progress)`。
+- [x] 实现 `getModeBaseParams(mode)`。
+- [x] 实现 `applyPhaseRules`。
+- [x] 实现 `applyTimeRules`。
+- [x] 实现 `mapStateToSoundParams(state, preference, hour)`。
+- [x] 每 3-5 秒重新计算 SoundParams 并推给 AudioEngine。
 
 验收：入睡更暗、更少事件；deep 更安静；returning 有回归感；参数变化平滑。
 
