@@ -1,11 +1,15 @@
 /**
- * AudioEngine — ZenScape M3
+ * AudioEngine — ZenScape
  *
  * 多层混音 + 概率事件调度：
  * - 风（white noise + bandpass）
  * - 水（white noise + high bandpass）
- * - Drone（低频 oscillator + slight modulation）
+ * - Drone（低频 oscillator）
  * - 钟声/古琴（OneShotPlayer + Scheduler 概率触发）
+ *
+ * 信号链：layers → masterGain → fadeGain → destination
+ * fadeGain 负责播放/停止的淡入淡出（从 0 到 1）
+ * masterGain 负责音量滑杆
  */
 
 import { OneShotPlayer } from './OneShotPlayer'
@@ -13,6 +17,7 @@ import { Scheduler, type SchedulerParams } from './scheduler'
 
 const FADE_DURATION = 3
 const BUFFER_SECONDS = 8
+const FADE_IN_TIME = 0.5 // 总线淡入 500ms
 
 // — 层配置 —
 interface LayerConfig {
@@ -62,6 +67,7 @@ export type LayerName = 'wind' | 'water' | 'drone'
 export class AudioEngine {
   private ctx: AudioContext | null = null
   private masterGain: GainNode | null = null
+  private fadeGain: GainNode | null = null // 总线淡入淡出节点
   private layers: Map<LayerName, ActiveLayer> = new Map()
   private _playing = false
   private _fading = false
@@ -84,9 +90,15 @@ export class AudioEngine {
   init(): void {
     if (this.ctx) return
     this.ctx = new AudioContext()
+
+    // 信号链：layers → masterGain → fadeGain → destination
+    this.fadeGain = this.ctx.createGain()
+    this.fadeGain.gain.value = 0 // 播放前静音
+    this.fadeGain.connect(this.ctx.destination)
+
     this.masterGain = this.ctx.createGain()
     this.masterGain.gain.value = this._masterVolume
-    this.masterGain.connect(this.ctx.destination)
+    this.masterGain.connect(this.fadeGain)
   }
 
   private async ensureRunning(): Promise<void> {
@@ -118,8 +130,8 @@ export class AudioEngine {
     this._brightness = clamp(value)
     if (!this.ctx) return
     const now = this.ctx.currentTime
-    for (const [, layer] of this.layers) {
-      const config = LAYER_CONFIGS[getLayerKey(layer, this.layers) ?? 'wind']
+    for (const [name, layer] of this.layers) {
+      const config = LAYER_CONFIGS[name]
       const freq = mapBrightness(this._brightness, config.filterFreq)
       layer.filter.frequency.setTargetAtTime(freq, now, 0.1)
     }
@@ -143,6 +155,10 @@ export class AudioEngine {
     const ctx = this.ctx!
     const now = ctx.currentTime
 
+    // 总线淡入：fadeGain 从 0 渐起到 1
+    this.fadeGain!.gain.setValueAtTime(0, now)
+    this.fadeGain!.gain.linearRampToValueAtTime(1, now + FADE_IN_TIME)
+
     this.createNoiseLayer('wind', now)
     this.createNoiseLayer('water', now)
     this.createDroneLayer('drone', now)
@@ -159,7 +175,7 @@ export class AudioEngine {
     this.scheduler.start()
   }
 
-  async stop(): Promise<void> {
+  stop(): void {
     if (!this._playing || !this.ctx) {
       this._playing = false
       return
@@ -169,22 +185,26 @@ export class AudioEngine {
     this._fading = true
     const now = this.ctx.currentTime
 
-    for (const [, layer] of this.layers) {
-      layer.gain.gain.setValueAtTime(layer.gain.gain.value, now)
-      layer.gain.gain.exponentialRampToValueAtTime(0.001, now + FADE_DURATION)
-    }
+    // 总线淡出
+    this.fadeGain!.gain.cancelScheduledValues(now)
+    this.fadeGain!.gain.setValueAtTime(this.fadeGain!.gain.value, now)
+    this.fadeGain!.gain.linearRampToValueAtTime(0, now + FADE_DURATION)
 
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        this.stopImmediate()
-        this._fading = false
-        resolve()
-      }, FADE_DURATION * 1000)
-    })
+    setTimeout(() => {
+      this.stopImmediate()
+      this._fading = false
+    }, FADE_DURATION * 1000)
   }
 
   stopImmediate(): void {
     this.scheduler?.stop()
+
+    // 立即静音总线
+    if (this.fadeGain && this.ctx) {
+      this.fadeGain.gain.cancelScheduledValues(this.ctx.currentTime)
+      this.fadeGain.gain.setValueAtTime(0, this.ctx.currentTime)
+    }
+
     for (const [, layer] of this.layers) {
       try { layer.source.stop() } catch { /* already stopped */ }
       layer.source.disconnect()
@@ -203,6 +223,8 @@ export class AudioEngine {
     this.oneShotPlayer = null
     this.masterGain?.disconnect()
     this.masterGain = null
+    this.fadeGain?.disconnect()
+    this.fadeGain = null
     this.ctx?.close()
     this.ctx = null
   }
@@ -224,16 +246,12 @@ export class AudioEngine {
 
     const gain = ctx.createGain()
     const layerGain = name === 'wind' ? this._natureLevel : this._natureLevel * 0.7
-    // 保持 20ms 静默，让源稳定后再渐起（彻底消除启动 click）
-    gain.gain.setValueAtTime(0, now)
-    gain.gain.setValueAtTime(0, now + 0.02)
-    gain.gain.linearRampToValueAtTime(layerGain, now + 0.02 + FADE_DURATION)
+    gain.gain.setValueAtTime(layerGain, now) // 层增益直接设为目标值
 
     source.connect(filter)
     filter.connect(gain)
     gain.connect(this.masterGain!)
-    // 源延后 50ms 启动，确保增益已经在 0 位
-    source.start(now + 0.05)
+    source.start(now)
 
     this.layers.set(name, { source, filter, gain })
   }
@@ -243,25 +261,21 @@ export class AudioEngine {
     const config = LAYER_CONFIGS.drone
 
     const osc = ctx.createOscillator()
-    osc.type = 'triangle' // triangle 比 sine 更柔
+    osc.type = 'triangle'
     osc.frequency.value = config.oscFreq!
-
-    // 去掉 LFO 调制，避免呜呜声
 
     const filter = ctx.createBiquadFilter()
     filter.type = config.filterType
-    filter.frequency.value = mapBrightness(this._brightness, config.filterFreq) * 0.3 // 非常暗
+    filter.frequency.value = mapBrightness(this._brightness, config.filterFreq) * 0.3
     filter.Q.value = config.filterQ
 
     const gain = ctx.createGain()
-    gain.gain.setValueAtTime(0, now)
-    gain.gain.setValueAtTime(0, now + 0.02)
-    gain.gain.linearRampToValueAtTime(this._instrumentLevel * 0.25, now + 0.02 + FADE_DURATION) // 音量再减半
+    gain.gain.setValueAtTime(this._instrumentLevel * 0.25, now) // 层增益直接设为目标值
 
     osc.connect(filter)
     filter.connect(gain)
     gain.connect(this.masterGain!)
-    osc.start(now + 0.05) // 延后启动
+    osc.start(now)
 
     this.layers.set(name, { source: osc, filter, gain })
   }
@@ -286,17 +300,14 @@ export class AudioEngine {
     const raw = new Float32Array(length)
     for (let i = 0; i < length; i++) raw[i] = Math.random() * 2 - 1
 
-    // 循环移动平均：窗口跨过 buffer 末尾时从头继续取
-    // 这样循环播放时首尾完全连续，不会产生 click
-    const win = Math.floor(sr * 0.015) // 15ms 窗口
+    // 循环移动平均
+    const win = Math.floor(sr * 0.015)
     let sum = 0
-    // 先算第一个点的窗口和（循环取）
     for (let j = 0; j < win; j++) {
       sum += raw[j % length]
     }
     for (let i = 0; i < length; i++) {
       data[i] = sum / win
-      // 滑动：去掉窗口左端，加上窗口右端（循环索引）
       sum -= raw[i]
       sum += raw[(i + win) % length]
     }
@@ -314,13 +325,6 @@ function clamp(v: number): number {
 
 function mapBrightness(brightness: number, baseFreq: number): number {
   return baseFreq * (0.3 + brightness * 2.2)
-}
-
-function getLayerKey(layer: ActiveLayer, map: Map<string, ActiveLayer>): string | null {
-  for (const [k, v] of map) {
-    if (v === layer) return k
-  }
-  return null
 }
 
 /** 全局单例 */
