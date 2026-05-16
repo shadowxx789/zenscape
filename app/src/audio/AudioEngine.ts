@@ -224,8 +224,9 @@ export class AudioEngine {
 
     const gain = ctx.createGain()
     const layerGain = name === 'wind' ? this._natureLevel : this._natureLevel * 0.7
-    gain.gain.setValueAtTime(0.001, now)
-    gain.gain.exponentialRampToValueAtTime(layerGain, now + FADE_DURATION)
+    // 从 0 线性渐起，不用 exponentialRamp（避免 click）
+    gain.gain.setValueAtTime(0, now)
+    gain.gain.linearRampToValueAtTime(layerGain, now + FADE_DURATION)
 
     source.connect(filter)
     filter.connect(gain)
@@ -251,8 +252,8 @@ export class AudioEngine {
     filter.Q.value = config.filterQ
 
     const gain = ctx.createGain()
-    gain.gain.setValueAtTime(0.001, now)
-    gain.gain.exponentialRampToValueAtTime(this._instrumentLevel * 0.5, now + FADE_DURATION) // 音量减半
+    gain.gain.setValueAtTime(0, now)
+    gain.gain.linearRampToValueAtTime(this._instrumentLevel * 0.5, now + FADE_DURATION)
 
     osc.connect(filter)
     filter.connect(gain)

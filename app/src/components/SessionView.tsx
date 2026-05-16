@@ -25,6 +25,14 @@ export function SessionView({ mode, duration, soundParams, onSoundParamsChange, 
   const [isPlaying, setIsPlaying] = useState(false)
   const [isFinished, setIsFinished] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  // 用户手动调过的参数，规则引擎不再覆盖
+  const userTouched = useRef<Set<keyof SoundParams>>(new Set())
+  // 用 ref 存最新 soundParams，避免 useEffect 闭包问题
+  const soundParamsRef = useRef(soundParams)
+  // 在 effect 里更新 ref，避免 render 期间写 ref
+  useEffect(() => {
+    soundParamsRef.current = soundParams
+  }, [soundParams])
 
   const clearTimer = useCallback(() => {
     if (intervalRef.current !== null) {
@@ -65,11 +73,17 @@ export function SessionView({ mode, duration, soundParams, onSoundParamsChange, 
       const progress = 1 - remaining / totalSeconds
       const hour = new Date().getHours()
       const output = computeParams(mode, progress, {}, hour)
-      onSoundParamsChange(output.soundParams)
+      // 只更新用户没手动调过的参数
+      const merged: SoundParams = { ...soundParamsRef.current }
+      for (const key of Object.keys(output.soundParams) as (keyof SoundParams)[]) {
+        if (!userTouched.current.has(key)) {
+          merged[key] = output.soundParams[key]
+        }
+      }
+      onSoundParamsChange(merged)
       audioEngine.setSchedulerParams(output.schedulerParams)
     }
 
-    // 立即算一次
     tick()
     const timer = setInterval(tick, 4000)
     return () => clearInterval(timer)
@@ -102,12 +116,14 @@ export function SessionView({ mode, duration, soundParams, onSoundParamsChange, 
 
   const handleRestart = () => {
     audioEngine.stopImmediate()
+    userTouched.current.clear()
     setRemaining(totalSeconds)
     setIsFinished(false)
     setIsPlaying(false)
   }
 
   const handleParamChange = (key: keyof SoundParams, value: number) => {
+    userTouched.current.add(key)
     onSoundParamsChange({ ...soundParams, [key]: value })
   }
 
