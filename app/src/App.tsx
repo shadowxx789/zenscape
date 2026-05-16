@@ -1,17 +1,26 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { DurationSelector } from './components/DurationSelector'
 import { ModeSelector } from './components/ModeSelector'
 import { SessionView } from './components/SessionView'
 import { SoundControls } from './components/SoundControls'
-import { DEFAULT_PARAMS, type SoundParams } from './audio/soundParams'
+import type { SoundParams } from './audio/soundParams'
 import type { Mode } from './types'
+import { loadPreferences, savePreferences } from './storage/preferenceStore'
 import './App.css'
 
+// 启动时加载保存的偏好
+const saved = loadPreferences()
+
 function App() {
-  const [mode, setMode] = useState<Mode>('meditate')
-  const [duration, setDuration] = useState(10)
-  const [soundParams, setSoundParams] = useState<SoundParams>(DEFAULT_PARAMS)
+  const [mode, setMode] = useState<Mode>(saved.mode)
+  const [duration, setDuration] = useState(saved.duration)
+  const [soundParams, setSoundParams] = useState<SoundParams>(saved.soundParams)
   const [isSessionActive, setIsSessionActive] = useState(false)
+
+  // 偏好变更时自动保存
+  useEffect(() => {
+    savePreferences({ mode, duration, soundParams })
+  }, [mode, duration, soundParams])
 
   if (isSessionActive) {
     return (
