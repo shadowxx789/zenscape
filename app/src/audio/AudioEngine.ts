@@ -20,6 +20,8 @@ import type { Mode } from '../types'
 const FADE_DURATION = 3
 const BUFFER_SECONDS = 61
 const FADE_IN_TIME = 0.5 // 总线淡入 500ms
+const USE_PINK_NOISE = true
+const PINK_NOISE_GAIN_COMPENSATION = 0.85
 
 // — 层配置 —
 interface LayerConfig {
@@ -343,7 +345,7 @@ export class AudioEngine {
 
   private getLayerGain(name: 'wind' | 'water'): number {
     const base = name === 'wind' ? this.preset.windGain : this.preset.waterGain
-    return this._natureLevel * base
+    return this._natureLevel * base * (USE_PINK_NOISE ? PINK_NOISE_GAIN_COMPENSATION : 1)
   }
 
   private applyLayerPan(name: LayerName): void {
@@ -354,17 +356,35 @@ export class AudioEngine {
 
   private getNoiseBuffer(name: 'wind' | 'water'): AudioBuffer {
     if (this._noiseBuffers[name]) return this._noiseBuffers[name]
+    if (!USE_PINK_NOISE) return this.getNoiseBufferLegacy(name)
+
     const ctx = this.ctx!
     const sr = ctx.sampleRate
     const length = sr * BUFFER_SECONDS
     const buffer = ctx.createBuffer(1, length, sr)
     const data = buffer.getChannelData(0)
+    const shaped = shapeForLayer(generatePinkNoise(length, sr), name, sr)
 
-    // 生成原始噪声，再用不同平滑窗口塑造风/水质感，避免短循环和同源相关感。
+    for (let i = 0; i < length; i++) {
+      const breath = name === 'wind'
+        ? 0.62 + 0.38 * Math.sin((i / sr) * Math.PI * 2 / 17 + Math.sin(i / sr / 11))
+        : 0.82 + 0.18 * Math.sin((i / sr) * Math.PI * 2 / 9.5)
+      data[i] = shaped[i] * breath
+    }
+
+    this._noiseBuffers[name] = buffer
+    return buffer
+  }
+
+  private getNoiseBufferLegacy(name: 'wind' | 'water'): AudioBuffer {
+    const ctx = this.ctx!
+    const sr = ctx.sampleRate
+    const length = sr * BUFFER_SECONDS
+    const buffer = ctx.createBuffer(1, length, sr)
+    const data = buffer.getChannelData(0)
     const raw = new Float32Array(length)
     for (let i = 0; i < length; i++) raw[i] = Math.random() * 2 - 1
 
-    // 循环移动平均
     const win = Math.floor(sr * (name === 'wind' ? 0.035 : 0.006))
     let sum = 0
     for (let j = 0; j < win; j++) {
@@ -426,6 +446,63 @@ function clamp(v: number): number {
 
 function mapBrightness(brightness: number, baseFreq: number): number {
   return baseFreq * (0.3 + brightness * 2.2)
+}
+
+function generatePinkNoise(length: number, sampleRate: number): Float32Array {
+  const out = new Float32Array(length)
+  if (!Number.isFinite(sampleRate) || sampleRate <= 0) return out
+
+  const rows = new Float32Array(16)
+  let runningSum = 0
+  let counter = 0
+
+  for (let i = 0; i < length; i++) {
+    counter++
+    const lowBit = counter & -counter
+    const rowIndex = Math.log2(lowBit) | 0
+    if (rowIndex < rows.length) {
+      runningSum -= rows[rowIndex]
+      rows[rowIndex] = Math.random() * 2 - 1
+      runningSum += rows[rowIndex]
+    }
+    const white = Math.random() * 2 - 1
+    out[i] = (runningSum + white) / (rows.length + 1)
+  }
+
+  return out
+}
+
+function shapeForLayer(samples: Float32Array, name: 'wind' | 'water', sampleRate: number): Float32Array {
+  // 1/f noise is the natural bed; wind tilts down like air through leaves, water keeps a gentler high band.
+  return name === 'wind'
+    ? applyOnePoleLowpass(samples, sampleRate, 1500)
+    : applyGentleHighpass(samples, sampleRate, 800)
+}
+
+function applyOnePoleLowpass(samples: Float32Array, sampleRate: number, cutoffHz: number): Float32Array {
+  const out = new Float32Array(samples.length)
+  const rc = 1 / (Math.PI * 2 * cutoffHz)
+  const dt = 1 / sampleRate
+  const alpha = dt / (rc + dt)
+  let state = 0
+
+  for (let i = 0; i < samples.length; i++) {
+    state += alpha * (samples[i] - state)
+    out[i] = state
+  }
+
+  return out
+}
+
+function applyGentleHighpass(samples: Float32Array, sampleRate: number, cutoffHz: number): Float32Array {
+  const out = new Float32Array(samples.length)
+  const low = applyOnePoleLowpass(samples, sampleRate, cutoffHz)
+
+  for (let i = 0; i < samples.length; i++) {
+    out[i] = samples[i] * 0.5 + (samples[i] - low[i]) * 0.5
+  }
+
+  return out
 }
 
 function getLayerPan(name: LayerName, spatialLevel: number, preset = getModePreset('meditate').engine): number {

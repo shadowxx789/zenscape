@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ZenScape Spectrum Test</title>
+  </head>
+  <body>
+    <button id="run">Run spectrum test</button>
+    <pre id="out">Idle</pre>
+
+    <script type="module">
+      import { audioEngine } from '../src/audio/AudioEngine.ts'
+
+      const out = document.querySelector('#out')
+
+      function bandEnergyDb(freqData, sampleRate, fftSize, targetHz) {
+        const binHz = sampleRate / fftSize
+        const minBin = Math.max(1, Math.floor((targetHz / Math.SQRT2) / binHz))
+        const maxBin = Math.min(freqData.length - 1, Math.ceil((targetHz * Math.SQRT2) / binHz))
+        let sum = 0
+        let count = 0
+
+        for (let i = minBin; i <= maxBin; i++) {
+          if (Number.isFinite(freqData[i])) {
+            sum += 10 ** (freqData[i] / 10)
+            count++
+          }
+        }
+
+        return 10 * Math.log10(sum / Math.max(1, count))
+      }
+
+      function dbPerOct(lowDb, highDb, lowHz, highHz) {
+        return (highDb - lowDb) / Math.log2(highHz / lowHz)
+      }
+
+      document.querySelector('#run').addEventListener('click', async () => {
+        const capturedBuffers = []
+        const originalCreateBufferSource = AudioContext.prototype.createBufferSource
+
+        AudioContext.prototype.createBufferSource = function patchedCreateBufferSource() {
+          const source = originalCreateBufferSource.call(this)
+          let assignedBuffer = null
+
+          Object.defineProperty(source, 'buffer', {
+            get() {
+              return assignedBuffer
+            },
+            set(value) {
+              assignedBuffer = value
+              if (value) capturedBuffers.push(value)
+            },
+          })
+
+          return source
+        }
+
+        try {
+          await audioEngine.play()
+          const windBuffer = capturedBuffers[0]
+          if (!windBuffer) throw new Error('No wind buffer captured')
+
+          AudioContext.prototype.createBufferSource = originalCreateBufferSource
+
+          const ctx = new AudioContext()
+          await ctx.resume()
+          const source = ctx.createBufferSource()
+          source.buffer = windBuffer
+
+          const analyser = ctx.createAnalyser()
+          analyser.fftSize = 32768
+          analyser.smoothingTimeConstant = 0
+
+          const silent = ctx.createGain()
+          silent.gain.value = 0
+
+          source.connect(analyser)
+          analyser.connect(silent)
+          silent.connect(ctx.destination)
+          source.start()
+
+          const freqData = new Float32Array(analyser.frequencyBinCount)
+          const accum = { e100: 0, e1k: 0, e10k: 0 }
+          const frames = 24
+
+          for (let i = 0; i < frames; i++) {
+            await new Promise((resolve) => setTimeout(resolve, 120))
+            analyser.getFloatFrequencyData(freqData)
+            accum.e100 += bandEnergyDb(freqData, ctx.sampleRate, analyser.fftSize, 100)
+            accum.e1k += bandEnergyDb(freqData, ctx.sampleRate, analyser.fftSize, 1000)
+            accum.e10k += bandEnergyDb(freqData, ctx.sampleRate, analyser.fftSize, 10000)
+          }
+
+          const e100 = accum.e100 / frames
+          const e1k = accum.e1k / frames
+          const e10k = accum.e10k / frames
+          const slope100To1k = dbPerOct(e100, e1k, 100, 1000)
+          const slope1kTo10k = dbPerOct(e1k, e10k, 1000, 10000)
+
+          const report = [
+            `100Hz: ${e100.toFixed(2)} dB`,
+            `1kHz: ${e1k.toFixed(2)} dB`,
+            `10kHz: ${e10k.toFixed(2)} dB`,
+            `slope 100Hz→1kHz: ${slope100To1k.toFixed(2)} dB/oct`,
+            `slope 1kHz→10kHz: ${slope1kTo10k.toFixed(2)} dB/oct`,
+          ].join('\n')
+
+          console.log(report)
+          out.textContent = report
+
+          source.stop()
+          await ctx.close()
+        } finally {
+          AudioContext.prototype.createBufferSource = originalCreateBufferSource
+          audioEngine.stopImmediate()
+        }
+      })
+    </script>
+  </body>
+</html>
