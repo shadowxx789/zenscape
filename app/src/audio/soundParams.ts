@@ -7,9 +7,9 @@ export type SoundParams = {
 }
 
 export const DEFAULT_PARAMS: SoundParams = {
-  masterVolume: 0.6,
-  natureLevel: 0.7,
-  instrumentLevel: 0.5,
-  spatialLevel: 0.3,
-  brightness: 0.5,
+  masterVolume: 0.48,
+  natureLevel: 0.62,
+  instrumentLevel: 0.34,
+  spatialLevel: 0.44,
+  brightness: 0.44,
 }

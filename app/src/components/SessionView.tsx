@@ -100,12 +100,13 @@ export function SessionView({
 
   // 参数实时同步到 engine
   useEffect(() => {
+    audioEngine.setMode(mode)
     audioEngine.setMasterVolume(sessionParams.masterVolume)
     audioEngine.setNatureLevel(sessionParams.natureLevel)
     audioEngine.setInstrumentLevel(sessionParams.instrumentLevel)
     audioEngine.setSpatialLevel(sessionParams.spatialLevel)
     audioEngine.setBrightness(sessionParams.brightness)
-  }, [sessionParams])
+  }, [mode, sessionParams])
 
   const handlePlayPause = async () => {
     if (isFinished) return

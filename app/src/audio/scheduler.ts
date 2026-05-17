@@ -20,21 +20,39 @@ export interface SchedulerParams {
   bellProbability: number
   /** 古琴触发概率 (0-0.18) */
   pluckProbability: number
+  /** 任意两个事件之间的最小间隔（秒） */
+  minEventGap?: number
+  /** 钟声之间的最小间隔（秒） */
+  bellMinGap?: number
+  /** 古琴之间的最小间隔（秒） */
+  pluckMinGap?: number
+  /** 开始播放后多久才允许第一次事件（秒） */
+  firstEventDelay?: number
 }
 
-const TICK_INTERVAL = 5 // 秒
-const MIN_EVENT_GAP = 8 // 两个事件之间最少间隔（秒）
+const TICK_MIN = 6 // 秒
+const TICK_MAX = 13 // 秒
+const MIN_EVENT_GAP = 24 // 两个事件之间最少间隔（秒）
 
 export const DEFAULT_SCHEDULER_PARAMS: SchedulerParams = {
-  density: 0.5,
-  bellProbability: 0.06,
-  pluckProbability: 0.10,
+  density: 0.3,
+  bellProbability: 0.025,
+  pluckProbability: 0.04,
+  minEventGap: MIN_EVENT_GAP,
+  bellMinGap: 85,
+  pluckMinGap: 55,
+  firstEventDelay: 18,
 }
 
 export class Scheduler {
   private player: OneShotPlayer
-  private timer: ReturnType<typeof setInterval> | null = null
+  private timer: ReturnType<typeof setTimeout> | null = null
+  private startedAt = 0
   private lastEventTime = 0
+  private lastByType: Record<EventType, number> = {
+    temple_bell: 0,
+    guqin_harmonic: 0,
+  }
   private params: SchedulerParams = { ...DEFAULT_SCHEDULER_PARAMS }
 
   constructor(player: OneShotPlayer) {
@@ -49,23 +67,18 @@ export class Scheduler {
   /** 启动调度 */
   start(): void {
     if (this.timer) return
-    this.lastEventTime = 0 // 重置，允许立即触发一次
-
-    this.timer = setInterval(() => {
-      this.tick()
-    }, TICK_INTERVAL * 1000)
-
-    // 立即做一次 tick（但概率较低，避免开场就响）
-    // 等 2 秒后再第一次 tick，给连续声音一点时间稳定
-    setTimeout(() => {
-      if (this.timer) this.tick()
-    }, 2000)
+    const now = Date.now() / 1000
+    this.startedAt = now
+    this.lastEventTime = now
+    this.lastByType.temple_bell = now
+    this.lastByType.guqin_harmonic = now
+    this.scheduleNext(this.params.firstEventDelay ?? DEFAULT_SCHEDULER_PARAMS.firstEventDelay!)
   }
 
   /** 停止调度 */
   stop(): void {
     if (this.timer) {
-      clearInterval(this.timer)
+      clearTimeout(this.timer)
       this.timer = null
     }
   }
@@ -77,27 +90,58 @@ export class Scheduler {
 
   private tick(): void {
     const now = Date.now() / 1000
+    const age = now - this.startedAt
 
     // 最小间隔检查
-    if (now - this.lastEventTime < MIN_EVENT_GAP) return
+    if (age < (this.params.firstEventDelay ?? 0)) {
+      this.scheduleNext()
+      return
+    }
+    if (now - this.lastEventTime < (this.params.minEventGap ?? MIN_EVENT_GAP)) {
+      this.scheduleNext()
+      return
+    }
 
     // density 影响整体触发意愿
-    if (Math.random() > this.params.density) return
+    if (Math.random() > this.params.density) {
+      this.scheduleNext()
+      return
+    }
 
     // 逐个事件类型判断
     const roll = Math.random()
 
     // 钟声
-    if (roll < this.params.bellProbability) {
+    if (
+      roll < this.params.bellProbability &&
+      now - this.lastByType.temple_bell >= (this.params.bellMinGap ?? 85)
+    ) {
       this.player.play('temple_bell')
       this.lastEventTime = now
+      this.lastByType.temple_bell = now
+      this.scheduleNext()
       return
     }
 
     // 古琴
-    if (roll < this.params.bellProbability + this.params.pluckProbability) {
+    if (
+      roll < this.params.bellProbability + this.params.pluckProbability &&
+      now - this.lastByType.guqin_harmonic >= (this.params.pluckMinGap ?? 55)
+    ) {
       this.player.play('guqin_harmonic')
       this.lastEventTime = now
+      this.lastByType.guqin_harmonic = now
     }
+
+    this.scheduleNext()
   }
+
+  private scheduleNext(delaySeconds = rand(TICK_MIN, TICK_MAX)): void {
+    this.stop()
+    this.timer = setTimeout(() => this.tick(), delaySeconds * 1000)
+  }
+}
+
+function rand(min: number, max: number): number {
+  return min + Math.random() * (max - min)
 }

@@ -5,6 +5,7 @@ import { SessionView } from './components/SessionView'
 import { SoundControls } from './components/SoundControls'
 import type { SoundParams } from './audio/soundParams'
 import type { Mode } from './types'
+import { getModePreset } from './audio/soundscapes'
 import { loadPreferences, resetPreferences, savePreferences } from './storage/preferenceStore'
 import heroImage from './assets/zen-bamboo-stream.jpg'
 import './App.css'
@@ -28,6 +29,11 @@ function App() {
     setMode(defaults.mode)
     setDuration(defaults.duration)
     setSoundParams(defaults.soundParams)
+  }
+
+  const handleModeChange = (nextMode: Mode) => {
+    setMode(nextMode)
+    setSoundParams(getModePreset(nextMode).sound)
   }
 
   if (isSessionActive) {
@@ -56,7 +62,7 @@ function App() {
       </section>
 
       <div className="setup-stack">
-        <ModeSelector value={mode} onChange={setMode} />
+        <ModeSelector value={mode} onChange={handleModeChange} />
         <DurationSelector value={duration} onChange={setDuration} />
         <SoundControls params={soundParams} onChange={setSoundParams} />
       </div>

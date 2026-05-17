@@ -5,6 +5,8 @@
  * exponentialRamp 只用于 decay（从有到无），不做 attack（从无到有）。
  */
 
+import type { PentatonicScale } from './soundscapes'
+
 type OneShotType = 'temple_bell' | 'guqin_harmonic'
 
 interface OneShotOptions {
@@ -22,6 +24,7 @@ export class OneShotPlayer {
   private masterGain: GainNode
   private spatialLevel = 0.3
   private instrumentLevel = 0.5
+  private scale: PentatonicScale = 'C'
 
   constructor(ctx: AudioContext, masterGain: GainNode) {
     this.ctx = ctx
@@ -34,6 +37,10 @@ export class OneShotPlayer {
 
   setInstrumentLevel(value: number): void {
     this.instrumentLevel = clamp(value)
+  }
+
+  setScale(scale: PentatonicScale): void {
+    this.scale = scale
   }
 
   play(type: OneShotType, opts?: OneShotOptions): void {
@@ -91,8 +98,14 @@ export class OneShotPlayer {
     lpf.connect(panner)
     panner.connect(this.masterGain)
 
-    const baseFreq = rand(400, 500)
-    this.addGuqinTone(lpf, baseFreq, volume, 5.0, now)
+    const freqs = getPentatonicFrequencies(this.scale)
+    const baseFreq = freqs[Math.floor(Math.random() * freqs.length)]
+    this.addGuqinTone(lpf, baseFreq, volume * 0.72, rand(4.8, 7.2), now)
+
+    if (Math.random() < 0.18) {
+      const secondFreq = freqs[Math.floor(Math.random() * freqs.length)]
+      this.addGuqinTone(lpf, secondFreq, volume * 0.34, rand(3.6, 5.6), now + rand(1.3, 2.8))
+    }
   }
 
   /**
@@ -164,4 +177,13 @@ function rand(min: number, max: number): number {
 
 function clamp(v: number): number {
   return Math.max(0, Math.min(1, v))
+}
+
+function getPentatonicFrequencies(scale: PentatonicScale): number[] {
+  const scales: Record<PentatonicScale, number[]> = {
+    C: [261.63, 293.66, 329.63, 392.0, 440.0, 523.25],
+    D: [293.66, 329.63, 369.99, 440.0, 493.88, 587.33],
+    G: [196.0, 220.0, 246.94, 293.66, 329.63, 392.0],
+  }
+  return scales[scale]
 }

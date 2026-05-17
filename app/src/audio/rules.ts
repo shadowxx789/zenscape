@@ -13,6 +13,7 @@
 
 import type { SoundParams } from './soundParams'
 import type { SchedulerParams } from './scheduler'
+import { getModePreset } from './soundscapes'
 
 // — 阶段定义 —
 
@@ -27,72 +28,33 @@ export function getPhase(progress: number): Phase {
 
 // — 模式基础参数 —
 
-interface ModeBase {
-  sound: SoundParams
-  scheduler: SchedulerParams
-  /** 该模式的阶段调节系数 */
+interface RulePreset {
   phaseModifiers: Record<Phase, Partial<SoundParams>>
 }
 
-const MODE_BASES: Record<string, ModeBase> = {
+const RULE_PRESETS: Record<string, RulePreset> = {
   meditate: {
-    sound: {
-      masterVolume: 0.5,
-      natureLevel: 0.6,
-      instrumentLevel: 0.4,
-      spatialLevel: 0.4,
-      brightness: 0.5,
-    },
-    scheduler: {
-      density: 0.5,
-      bellProbability: 0.06,
-      pluckProbability: 0.10,
-    },
     phaseModifiers: {
-      entering:  { natureLevel: +0.15, brightness: +0.1, instrumentLevel: +0.1 },
-      settling:  { natureLevel: +0.05, brightness: 0,     instrumentLevel: 0 },
-      deep:      { natureLevel: -0.1,  brightness: -0.15, instrumentLevel: -0.2 },
-      returning: { natureLevel: 0,     brightness: +0.1,  instrumentLevel: +0.05 },
+      entering:  { natureLevel: +0.08, brightness: +0.05, instrumentLevel: +0.04 },
+      settling:  { natureLevel: +0.03, brightness: -0.02 },
+      deep:      { natureLevel: -0.08, brightness: -0.10, instrumentLevel: -0.12, spatialLevel: +0.04 },
+      returning: { natureLevel: -0.02, brightness: +0.07, instrumentLevel: +0.03 },
     },
   },
   sleep: {
-    sound: {
-      masterVolume: 0.4,
-      natureLevel: 0.5,
-      instrumentLevel: 0.2,
-      spatialLevel: 0.5,
-      brightness: 0.3,
-    },
-    scheduler: {
-      density: 0.3,
-      bellProbability: 0.03,
-      pluckProbability: 0.04,
-    },
     phaseModifiers: {
-      entering:  { natureLevel: +0.1,  brightness: +0.05, instrumentLevel: +0.05 },
-      settling:  { natureLevel: 0,     brightness: -0.05, instrumentLevel: -0.05 },
-      deep:      { natureLevel: -0.15, brightness: -0.2,  instrumentLevel: -0.15 },
-      returning: { natureLevel: -0.1,  brightness: -0.1,  instrumentLevel: -0.1 },
+      entering:  { natureLevel: +0.05, brightness: +0.02 },
+      settling:  { natureLevel: +0.02, brightness: -0.05, instrumentLevel: -0.04 },
+      deep:      { natureLevel: -0.10, brightness: -0.12, instrumentLevel: -0.08, masterVolume: -0.04 },
+      returning: { natureLevel: -0.08, brightness: -0.08, instrumentLevel: -0.08, masterVolume: -0.06 },
     },
   },
   focus: {
-    sound: {
-      masterVolume: 0.5,
-      natureLevel: 0.5,
-      instrumentLevel: 0.5,
-      spatialLevel: 0.3,
-      brightness: 0.6,
-    },
-    scheduler: {
-      density: 0.6,
-      bellProbability: 0.04,
-      pluckProbability: 0.06,
-    },
     phaseModifiers: {
-      entering:  { natureLevel: +0.1,  brightness: +0.1,  instrumentLevel: +0.1 },
-      settling:  { natureLevel: 0,     brightness: 0,     instrumentLevel: 0 },
-      deep:      { natureLevel: -0.05, brightness: -0.1,  instrumentLevel: -0.1 },
-      returning: { natureLevel: +0.05, brightness: +0.15, instrumentLevel: +0.1 },
+      entering:  { natureLevel: +0.04, brightness: +0.04 },
+      settling:  { natureLevel: +0.02 },
+      deep:      { natureLevel: -0.02, brightness: -0.05, instrumentLevel: -0.07 },
+      returning: { natureLevel: +0.03, brightness: +0.08, instrumentLevel: +0.02 },
     },
   },
 }
@@ -133,32 +95,41 @@ export function computeParams(
   userOverrides: Partial<SoundParams>,
   hour: number,
 ): RulesOutput {
-  const base = MODE_BASES[mode] ?? MODE_BASES.meditate
+  const preset = getModePreset(mode)
+  const rules = RULE_PRESETS[mode] ?? RULE_PRESETS.meditate
   const phase = getPhase(progress)
 
-  const phaseMod = base.phaseModifiers[phase]
+  const phaseMod = rules.phaseModifiers[phase]
 
   // 时间段修饰
   const timeMod = getTimeModifier(hour)
 
   // 合并：基础 + 阶段修饰 + 时间修饰 + 用户覆盖
   const soundParams: SoundParams = {
-    masterVolume:    clamp((base.sound.masterVolume    + (phaseMod.masterVolume ?? 0)    + (timeMod.masterVolume ?? 0))    * (1 - (userOverrides.masterVolume ?? 0) === 0 ? 0 : 1) + (userOverrides.masterVolume ?? 0)),
-    natureLevel:     clamp((base.sound.natureLevel     + (phaseMod.natureLevel ?? 0)     + (timeMod.natureLevel ?? 0))),
-    instrumentLevel: clamp((base.sound.instrumentLevel + (phaseMod.instrumentLevel ?? 0) + (timeMod.instrumentLevel ?? 0))),
-    spatialLevel:    clamp((base.sound.spatialLevel    + (phaseMod.spatialLevel ?? 0)    + (timeMod.spatialLevel ?? 0))),
-    brightness:      clamp((base.sound.brightness      + (phaseMod.brightness ?? 0)      + (timeMod.brightness ?? 0))),
+    masterVolume:    mergeParam(preset.sound.masterVolume,    phaseMod.masterVolume,    timeMod.masterVolume,    userOverrides.masterVolume),
+    natureLevel:     mergeParam(preset.sound.natureLevel,     phaseMod.natureLevel,     timeMod.natureLevel,     userOverrides.natureLevel),
+    instrumentLevel: mergeParam(preset.sound.instrumentLevel, phaseMod.instrumentLevel, timeMod.instrumentLevel, userOverrides.instrumentLevel),
+    spatialLevel:    mergeParam(preset.sound.spatialLevel,    phaseMod.spatialLevel,    timeMod.spatialLevel,    userOverrides.spatialLevel),
+    brightness:      mergeParam(preset.sound.brightness,      phaseMod.brightness,      timeMod.brightness,      userOverrides.brightness),
   }
 
   // 调度器参数也随阶段变化
-  const densityMod = phase === 'deep' ? 0.4 : phase === 'entering' ? 1.2 : phase === 'returning' ? 0.8 : 1.0
+  const densityMod = phase === 'deep' ? 0.28 : phase === 'entering' ? 1.08 : phase === 'returning' ? 0.72 : 0.82
+  const eventMod = phase === 'deep' ? 0.25 : phase === 'entering' ? 1.0 : phase === 'returning' ? 0.62 : 0.78
   const schedulerParams: SchedulerParams = {
-    density: clamp(base.scheduler.density * densityMod),
-    bellProbability: base.scheduler.bellProbability * (phase === 'deep' ? 0.3 : 1.0),
-    pluckProbability: base.scheduler.pluckProbability * (phase === 'deep' ? 0.3 : 1.0),
+    ...preset.scheduler,
+    density: clamp(preset.scheduler.density * densityMod),
+    bellProbability: preset.scheduler.bellProbability * eventMod,
+    pluckProbability: preset.scheduler.pluckProbability * eventMod,
+    minEventGap: Math.round((preset.scheduler.minEventGap ?? 24) * (phase === 'deep' ? 1.4 : 1)),
   }
 
   return { soundParams, schedulerParams }
+}
+
+function mergeParam(base: number, phase = 0, time = 0, user?: number): number {
+  if (typeof user === 'number') return clamp(user)
+  return clamp(base + phase + time)
 }
 
 function clamp(v: number): number {
