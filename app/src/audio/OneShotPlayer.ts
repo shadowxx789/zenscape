@@ -21,6 +21,7 @@ export class OneShotPlayer {
   private ctx: AudioContext
   private masterGain: GainNode
   private spatialLevel = 0.3
+  private instrumentLevel = 0.5
 
   constructor(ctx: AudioContext, masterGain: GainNode) {
     this.ctx = ctx
@@ -31,10 +32,14 @@ export class OneShotPlayer {
     this.spatialLevel = clamp(value)
   }
 
+  setInstrumentLevel(value: number): void {
+    this.instrumentLevel = clamp(value)
+  }
+
   play(type: OneShotType, opts?: OneShotOptions): void {
     const options = { ...DEFAULT_OPTIONS, ...opts }
     const now = this.ctx.currentTime
-    const volume = rand(options.volumeRange[0], options.volumeRange[1])
+    const volume = rand(options.volumeRange[0], options.volumeRange[1]) * this.instrumentLevel
     const pan = rand(options.panRange[0], options.panRange[1]) * this.spatialLevel
 
     if (type === 'temple_bell') {

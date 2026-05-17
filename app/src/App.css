@@ -228,10 +228,9 @@ button {
   position: fixed;
   inset: 0;
   z-index: -2;
-  background:
-    linear-gradient(180deg, rgba(2, 5, 5, 0.48), rgba(2, 5, 5, 0.88)),
-    linear-gradient(90deg, rgba(2, 5, 5, 0.78), rgba(2, 5, 5, 0.18), rgba(2, 5, 5, 0.78)),
-    var(--session-bg) center / cover no-repeat;
+  background: var(--session-bg) center / cover no-repeat;
+  filter: brightness(1.42) saturate(1.08);
+  transform: scale(1.01);
 }
 
 .session-view::after {
@@ -239,7 +238,10 @@ button {
   position: fixed;
   inset: 0;
   z-index: -1;
-  background: rgba(3, 8, 7, 0.26);
+  background:
+    linear-gradient(180deg, rgba(2, 5, 5, 0.04), rgba(2, 5, 5, 0.22)),
+    linear-gradient(90deg, rgba(2, 5, 5, 0.22), rgba(2, 5, 5, 0.02), rgba(2, 5, 5, 0.22)),
+    radial-gradient(circle at center, rgba(3, 8, 7, 0.04), rgba(3, 8, 7, 0.22) 74%);
 }
 
 .session-orb {
@@ -448,6 +450,22 @@ button {
 .session-view > :not(.particle-canvas) {
   position: relative;
   z-index: 1;
+}
+
+.session-view h1,
+.session-copy,
+.countdown,
+.session-view .section-kicker {
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.72);
+}
+
+.session-sliders,
+.session-actions {
+  padding: 12px;
+  border: 1px solid rgba(233, 211, 164, 0.14);
+  border-radius: 8px;
+  background: rgba(3, 8, 7, 0.42);
+  backdrop-filter: blur(14px);
 }
 
 .home-actions {

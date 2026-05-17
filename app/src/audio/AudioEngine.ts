@@ -18,6 +18,7 @@ import { Scheduler, type SchedulerParams } from './scheduler'
 const FADE_DURATION = 3
 const BUFFER_SECONDS = 8
 const FADE_IN_TIME = 0.5 // 总线淡入 500ms
+const DRONE_GAIN_SCALE = 0.12
 
 // — 层配置 —
 interface LayerConfig {
@@ -47,11 +48,11 @@ const LAYER_CONFIGS: Record<string, LayerConfig> = {
   },
   drone: {
     type: 'oscillator',
-    filterFreq: 200,
-    filterQ: 1.0,
+    filterFreq: 150,
+    filterQ: 0.45,
     filterType: 'lowpass',
     defaultGain: 0.25,
-    oscFreq: 80,
+    oscFreq: 62,
     oscType: 'sine',
   },
 }
@@ -124,7 +125,8 @@ export class AudioEngine {
 
   setInstrumentLevel(value: number): void {
     this._instrumentLevel = clamp(value)
-    this.applyLayerGain('drone', this._instrumentLevel)
+    this.applyLayerGain('drone', this.getDroneGain())
+    this.oneShotPlayer?.setInstrumentLevel(this._instrumentLevel)
   }
 
   setBrightness(value: number): void {
@@ -175,6 +177,7 @@ export class AudioEngine {
       this.oneShotPlayer = new OneShotPlayer(ctx, this.masterGain!)
     }
     this.oneShotPlayer.setSpatialLevel(this._spatialLevel)
+    this.oneShotPlayer.setInstrumentLevel(this._instrumentLevel)
     if (!this.scheduler) {
       this.scheduler = new Scheduler(this.oneShotPlayer)
     }
@@ -272,7 +275,7 @@ export class AudioEngine {
     const config = LAYER_CONFIGS.drone
 
     const osc = ctx.createOscillator()
-    osc.type = 'triangle'
+    osc.type = config.oscType!
     osc.frequency.value = config.oscFreq!
 
     const filter = ctx.createBiquadFilter()
@@ -281,7 +284,7 @@ export class AudioEngine {
     filter.Q.value = config.filterQ
 
     const gain = ctx.createGain()
-    gain.gain.setValueAtTime(this._instrumentLevel * 0.25, now) // 层增益直接设为目标值
+    gain.gain.setValueAtTime(this.getDroneGain(), now)
 
     const panner = ctx.createStereoPanner()
     panner.pan.value = getLayerPan(name, this._spatialLevel)
@@ -301,6 +304,10 @@ export class AudioEngine {
     const layer = this.layers.get(name)
     if (!layer || !this.ctx) return
     layer.gain.gain.setTargetAtTime(value, this.ctx.currentTime, 0.05)
+  }
+
+  private getDroneGain(): number {
+    return this._instrumentLevel * DRONE_GAIN_SCALE
   }
 
   private applyLayerPan(name: LayerName): void {
