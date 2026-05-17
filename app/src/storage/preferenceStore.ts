@@ -19,7 +19,7 @@ export interface Preferences {
   soundParams: SoundParams
 }
 
-const DEFAULT_PREFS: Preferences = {
+export const DEFAULT_PREFS: Preferences = {
   mode: 'meditate',
   duration: DEFAULT_DURATION,
   soundParams: { ...DEFAULT_PARAMS },
@@ -52,4 +52,14 @@ export function savePreferences(prefs: Preferences): void {
   } catch {
     // localStorage 满了或不可用，静默失败
   }
+}
+
+export function resetPreferences(): Preferences {
+  const prefs = {
+    mode: DEFAULT_PREFS.mode,
+    duration: DEFAULT_PREFS.duration,
+    soundParams: { ...DEFAULT_PREFS.soundParams },
+  }
+  savePreferences(prefs)
+  return prefs
 }

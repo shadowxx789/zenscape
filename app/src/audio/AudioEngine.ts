@@ -59,6 +59,7 @@ const LAYER_CONFIGS: Record<string, LayerConfig> = {
 interface ActiveLayer {
   source: AudioBufferSourceNode | OscillatorNode
   filter: BiquadFilterNode
+  panner: StereoPannerNode
   gain: GainNode
 }
 
@@ -139,6 +140,10 @@ export class AudioEngine {
 
   setSpatialLevel(value: number): void {
     this._spatialLevel = clamp(value)
+    this.oneShotPlayer?.setSpatialLevel(this._spatialLevel)
+    this.applyLayerPan('wind')
+    this.applyLayerPan('water')
+    this.applyLayerPan('drone')
   }
 
   /** 更新调度器参数（钟声/古琴概率） */
@@ -169,6 +174,7 @@ export class AudioEngine {
     if (!this.oneShotPlayer) {
       this.oneShotPlayer = new OneShotPlayer(ctx, this.masterGain!)
     }
+    this.oneShotPlayer.setSpatialLevel(this._spatialLevel)
     if (!this.scheduler) {
       this.scheduler = new Scheduler(this.oneShotPlayer)
     }
@@ -209,6 +215,7 @@ export class AudioEngine {
       try { layer.source.stop() } catch { /* already stopped */ }
       layer.source.disconnect()
       layer.filter.disconnect()
+      layer.panner.disconnect()
       layer.gain.disconnect()
     }
     this.layers.clear()
@@ -248,12 +255,16 @@ export class AudioEngine {
     const layerGain = name === 'wind' ? this._natureLevel : this._natureLevel * 0.7
     gain.gain.setValueAtTime(layerGain, now) // 层增益直接设为目标值
 
+    const panner = ctx.createStereoPanner()
+    panner.pan.value = getLayerPan(name, this._spatialLevel)
+
     source.connect(filter)
-    filter.connect(gain)
+    filter.connect(panner)
+    panner.connect(gain)
     gain.connect(this.masterGain!)
     source.start(now)
 
-    this.layers.set(name, { source, filter, gain })
+    this.layers.set(name, { source, filter, panner, gain })
   }
 
   private createDroneLayer(name: 'drone', now: number): void {
@@ -272,12 +283,16 @@ export class AudioEngine {
     const gain = ctx.createGain()
     gain.gain.setValueAtTime(this._instrumentLevel * 0.25, now) // 层增益直接设为目标值
 
+    const panner = ctx.createStereoPanner()
+    panner.pan.value = getLayerPan(name, this._spatialLevel)
+
     osc.connect(filter)
-    filter.connect(gain)
+    filter.connect(panner)
+    panner.connect(gain)
     gain.connect(this.masterGain!)
     osc.start(now)
 
-    this.layers.set(name, { source: osc, filter, gain })
+    this.layers.set(name, { source: osc, filter, panner, gain })
   }
 
   // — 内部：工具 —
@@ -286,6 +301,12 @@ export class AudioEngine {
     const layer = this.layers.get(name)
     if (!layer || !this.ctx) return
     layer.gain.gain.setTargetAtTime(value, this.ctx.currentTime, 0.05)
+  }
+
+  private applyLayerPan(name: LayerName): void {
+    const layer = this.layers.get(name)
+    if (!layer || !this.ctx) return
+    layer.panner.pan.setTargetAtTime(getLayerPan(name, this._spatialLevel), this.ctx.currentTime, 0.2)
   }
 
   private getNoiseBuffer(): AudioBuffer {
@@ -325,6 +346,15 @@ function clamp(v: number): number {
 
 function mapBrightness(brightness: number, baseFreq: number): number {
   return baseFreq * (0.3 + brightness * 2.2)
+}
+
+function getLayerPan(name: LayerName, spatialLevel: number): number {
+  const positions: Record<LayerName, number> = {
+    wind: -0.35,
+    water: 0.28,
+    drone: 0,
+  }
+  return positions[name] * spatialLevel
 }
 
 /** 全局单例 */

@@ -5,6 +5,7 @@ import { computeParams, getPhase, type Phase } from '../audio/rules'
 import type { Mode } from '../types'
 import { audioEngine } from '../audio/AudioEngine'
 import { ParticleCanvas } from './ParticleCanvas'
+import sessionImage from '../assets/zen-night-valley.jpg'
 
 type SessionViewProps = {
   mode: Mode
@@ -20,20 +21,27 @@ function formatTime(totalSeconds: number) {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
-export function SessionView({ mode, duration, soundParams, onSoundParamsChange, onReturn }: SessionViewProps) {
+export function SessionView({
+  mode,
+  duration,
+  soundParams: initialSoundParams,
+  onSoundParamsChange,
+  onReturn,
+}: SessionViewProps) {
   const totalSeconds = duration * 60
   const [remaining, setRemaining] = useState(totalSeconds)
   const [isPlaying, setIsPlaying] = useState(false)
   const [isFinished, setIsFinished] = useState(false)
+  const [sessionParams, setSessionParams] = useState<SoundParams>(initialSoundParams)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   // 用户手动调过的参数，规则引擎不再覆盖
   const userTouched = useRef<Set<keyof SoundParams>>(new Set())
-  // 用 ref 存最新 soundParams，避免 useEffect 闭包问题
-  const soundParamsRef = useRef(soundParams)
+  // 用 ref 存最新 sessionParams，避免 useEffect 闭包问题
+  const sessionParamsRef = useRef(sessionParams)
   // 在 effect 里更新 ref，避免 render 期间写 ref
   useEffect(() => {
-    soundParamsRef.current = soundParams
-  }, [soundParams])
+    sessionParamsRef.current = sessionParams
+  }, [sessionParams])
 
   const clearTimer = useCallback(() => {
     if (intervalRef.current !== null) {
@@ -75,29 +83,29 @@ export function SessionView({ mode, duration, soundParams, onSoundParamsChange, 
       const hour = new Date().getHours()
       const output = computeParams(mode, progress, {}, hour)
       // 只更新用户没手动调过的参数
-      const merged: SoundParams = { ...soundParamsRef.current }
+      const merged: SoundParams = { ...sessionParamsRef.current }
       for (const key of Object.keys(output.soundParams) as (keyof SoundParams)[]) {
         if (!userTouched.current.has(key)) {
           merged[key] = output.soundParams[key]
         }
       }
-      onSoundParamsChange(merged)
+      setSessionParams(merged)
       audioEngine.setSchedulerParams(output.schedulerParams)
     }
 
     tick()
     const timer = setInterval(tick, 4000)
     return () => clearInterval(timer)
-  }, [isPlaying, isFinished, remaining, totalSeconds, mode, onSoundParamsChange])
+  }, [isPlaying, isFinished, remaining, totalSeconds, mode])
 
   // 参数实时同步到 engine
   useEffect(() => {
-    audioEngine.setMasterVolume(soundParams.masterVolume)
-    audioEngine.setNatureLevel(soundParams.natureLevel)
-    audioEngine.setInstrumentLevel(soundParams.instrumentLevel)
-    audioEngine.setSpatialLevel(soundParams.spatialLevel)
-    audioEngine.setBrightness(soundParams.brightness)
-  }, [soundParams])
+    audioEngine.setMasterVolume(sessionParams.masterVolume)
+    audioEngine.setNatureLevel(sessionParams.natureLevel)
+    audioEngine.setInstrumentLevel(sessionParams.instrumentLevel)
+    audioEngine.setSpatialLevel(sessionParams.spatialLevel)
+    audioEngine.setBrightness(sessionParams.brightness)
+  }, [sessionParams])
 
   const handlePlayPause = async () => {
     if (isFinished) return
@@ -125,7 +133,9 @@ export function SessionView({ mode, duration, soundParams, onSoundParamsChange, 
 
   const handleParamChange = (key: keyof SoundParams, value: number) => {
     userTouched.current.add(key)
-    onSoundParamsChange({ ...soundParams, [key]: value })
+    const nextParams = { ...sessionParams, [key]: value }
+    setSessionParams(nextParams)
+    onSoundParamsChange(nextParams)
   }
 
   const progress = 1 - remaining / totalSeconds
@@ -138,8 +148,12 @@ export function SessionView({ mode, duration, soundParams, onSoundParamsChange, 
   }
 
   return (
-    <main className="session-view" aria-label="声景会话">
-      <ParticleCanvas isPlaying={isPlaying} brightness={soundParams.brightness} />
+    <main
+      className="session-view"
+      aria-label="声景会话"
+      style={{ '--session-bg': `url(${sessionImage})` } as React.CSSProperties}
+    >
+      <ParticleCanvas isPlaying={isPlaying} brightness={sessionParams.brightness} />
       <div className="session-orb" aria-hidden="true">
         <svg viewBox="0 0 184 184" className="orb-ring">
           <circle cx="92" cy="92" r="90" fill="none" stroke="rgba(233,211,164,0.12)" strokeWidth="1" />
@@ -190,7 +204,7 @@ export function SessionView({ mode, duration, soundParams, onSoundParamsChange, 
                 min={0}
                 max={1}
                 step={0.01}
-                value={soundParams[key]}
+                value={sessionParams[key]}
                 onChange={(e) => handleParamChange(key, Number(e.target.value))}
                 className="zen-slider zen-slider--sm"
               />

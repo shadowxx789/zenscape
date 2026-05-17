@@ -8,31 +8,69 @@ button {
 
 .home-view,
 .session-view {
-  width: min(100%, 560px);
   min-height: 100svh;
   margin: 0 auto;
-  padding: 32px 20px;
   box-sizing: border-box;
 }
 
 .home-view {
+  width: min(100%, 1080px);
   display: flex;
   flex-direction: column;
-  gap: 22px;
-}
-
-.hero-panel,
-.selector-block,
-.session-view {
-  border: 1px solid var(--border);
-  background: linear-gradient(145deg, rgba(237, 211, 164, 0.1), rgba(255, 255, 255, 0.03));
-  border-radius: 28px;
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.22);
+  gap: 18px;
+  padding: 18px;
 }
 
 .hero-panel,
 .selector-block {
-  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 18px 70px rgba(0, 0, 0, 0.28);
+}
+
+.hero-panel {
+  position: relative;
+  min-height: clamp(360px, 58svh, 620px);
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+  background: #0b1712;
+}
+
+.hero-panel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(4, 9, 7, 0.82), rgba(4, 9, 7, 0.24) 56%, rgba(4, 9, 7, 0.08)),
+    linear-gradient(0deg, rgba(4, 9, 7, 0.72), transparent 46%);
+}
+
+.hero-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.01);
+}
+
+.hero-content {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 620px);
+  padding: clamp(28px, 6vw, 64px);
+}
+
+.selector-block {
+  padding: 20px;
+  background: rgba(11, 20, 17, 0.82);
+  backdrop-filter: blur(18px);
+}
+
+.setup-stack {
+  display: grid;
+  gap: 14px;
 }
 
 .section-kicker {
@@ -48,9 +86,9 @@ button {
 .session-view h1 {
   margin: 0;
   color: var(--text-h);
-  font-size: clamp(2.35rem, 11vw, 4.4rem);
-  line-height: 0.95;
-  letter-spacing: -0.08em;
+  font-size: clamp(2.35rem, 9vw, 5.4rem);
+  line-height: 1;
+  letter-spacing: 0;
 }
 
 .hero-copy,
@@ -112,8 +150,8 @@ button {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 18px;
-  border-radius: 20px;
+  padding: 16px;
+  border-radius: 8px;
   text-align: left;
 }
 
@@ -129,7 +167,7 @@ button {
 
 .duration-pill {
   min-height: 72px;
-  border-radius: 20px;
+  border-radius: 8px;
   font-size: 1.35rem;
   font-weight: 800;
 }
@@ -154,7 +192,7 @@ button {
 .primary-action,
 .ghost-action {
   min-height: 56px;
-  border-radius: 999px;
+  border-radius: 8px;
   padding: 0 24px;
   font-weight: 800;
 }
@@ -166,13 +204,42 @@ button {
   background: linear-gradient(135deg, #e9d3a4, #b9d8c2);
 }
 
+.reset-button {
+  width: 100%;
+  min-height: 48px;
+}
+
 .session-view {
+  position: relative;
+  isolation: isolate;
+  width: min(100%, 720px);
+  padding: 32px 20px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 22px;
   text-align: center;
+  overflow: hidden;
+}
+
+.session-view::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background:
+    linear-gradient(180deg, rgba(2, 5, 5, 0.48), rgba(2, 5, 5, 0.88)),
+    linear-gradient(90deg, rgba(2, 5, 5, 0.78), rgba(2, 5, 5, 0.18), rgba(2, 5, 5, 0.78)),
+    var(--session-bg) center / cover no-repeat;
+}
+
+.session-view::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: rgba(3, 8, 7, 0.26);
 }
 
 .session-orb {
@@ -376,4 +443,30 @@ button {
   height: 100vh;
   pointer-events: none;
   z-index: 0;
+}
+
+.session-view > :not(.particle-canvas) {
+  position: relative;
+  z-index: 1;
+}
+
+.home-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 720px) {
+  .setup-stack {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+
+  .sound-controls {
+    grid-column: 1 / -1;
+  }
+
+  .home-actions {
+    grid-template-columns: 180px 1fr;
+  }
 }

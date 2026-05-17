@@ -20,17 +20,22 @@ const DEFAULT_OPTIONS: Required<OneShotOptions> = {
 export class OneShotPlayer {
   private ctx: AudioContext
   private masterGain: GainNode
+  private spatialLevel = 0.3
 
   constructor(ctx: AudioContext, masterGain: GainNode) {
     this.ctx = ctx
     this.masterGain = masterGain
   }
 
+  setSpatialLevel(value: number): void {
+    this.spatialLevel = clamp(value)
+  }
+
   play(type: OneShotType, opts?: OneShotOptions): void {
     const options = { ...DEFAULT_OPTIONS, ...opts }
     const now = this.ctx.currentTime
     const volume = rand(options.volumeRange[0], options.volumeRange[1])
-    const pan = rand(options.panRange[0], options.panRange[1])
+    const pan = rand(options.panRange[0], options.panRange[1]) * this.spatialLevel
 
     if (type === 'temple_bell') {
       this.synthBell(now, volume, pan)
@@ -150,4 +155,8 @@ export class OneShotPlayer {
 
 function rand(min: number, max: number): number {
   return min + Math.random() * (max - min)
+}
+
+function clamp(v: number): number {
+  return Math.max(0, Math.min(1, v))
 }

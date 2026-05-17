@@ -5,7 +5,8 @@ import { SessionView } from './components/SessionView'
 import { SoundControls } from './components/SoundControls'
 import type { SoundParams } from './audio/soundParams'
 import type { Mode } from './types'
-import { loadPreferences, savePreferences } from './storage/preferenceStore'
+import { loadPreferences, resetPreferences, savePreferences } from './storage/preferenceStore'
+import heroImage from './assets/zen-bamboo-stream.jpg'
 import './App.css'
 
 // 启动时加载保存的偏好
@@ -22,6 +23,13 @@ function App() {
     savePreferences({ mode, duration, soundParams })
   }, [mode, duration, soundParams])
 
+  const handleResetPreferences = () => {
+    const defaults = resetPreferences()
+    setMode(defaults.mode)
+    setDuration(defaults.duration)
+    setSoundParams(defaults.soundParams)
+  }
+
   if (isSessionActive) {
     return (
       <SessionView
@@ -37,20 +45,31 @@ function App() {
   return (
     <main className="home-view">
       <section className="hero-panel" aria-labelledby="app-title">
-        <p className="section-kicker">ZenScape</p>
-        <h1 id="app-title">禅音 ZenScape</h1>
-        <p className="hero-copy">
-          选择一个场景，让风、水、钟与古琴慢慢生成一段不急着结束的安静。
-        </p>
+        <img className="hero-image" src={heroImage} alt="" aria-hidden="true" />
+        <div className="hero-content">
+          <p className="section-kicker">ZenScape</p>
+          <h1 id="app-title">禅音 ZenScape</h1>
+          <p className="hero-copy">
+            选择一个场景，让风、水、钟与古琴慢慢生成一段不急着结束的安静。
+          </p>
+        </div>
       </section>
 
-      <ModeSelector value={mode} onChange={setMode} />
-      <DurationSelector value={duration} onChange={setDuration} />
-      <SoundControls params={soundParams} onChange={setSoundParams} />
+      <div className="setup-stack">
+        <ModeSelector value={mode} onChange={setMode} />
+        <DurationSelector value={duration} onChange={setDuration} />
+        <SoundControls params={soundParams} onChange={setSoundParams} />
+      </div>
 
-      <button type="button" className="start-button" onClick={() => setIsSessionActive(true)}>
-        开始声景
-      </button>
+      <div className="home-actions">
+        <button type="button" className="ghost-action reset-button" onClick={handleResetPreferences}>
+          恢复默认
+        </button>
+
+        <button type="button" className="start-button" onClick={() => setIsSessionActive(true)}>
+          开始声景
+        </button>
+      </div>
     </main>
   )
 }
