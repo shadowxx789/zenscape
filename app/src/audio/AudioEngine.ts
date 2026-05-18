@@ -22,6 +22,7 @@ const BUFFER_SECONDS = 61
 const FADE_IN_TIME = 0.5 // 总线淡入 500ms
 const USE_PINK_NOISE = true
 const PINK_NOISE_GAIN_COMPENSATION = 0.85
+const LOOP_CROSSFADE_SECONDS = 0.75
 
 // — 层配置 —
 interface LayerConfig {
@@ -371,6 +372,7 @@ export class AudioEngine {
         : 0.82 + 0.18 * Math.sin((i / sr) * Math.PI * 2 / 9.5)
       data[i] = shaped[i] * breath
     }
+    data.set(applyLoopCrossfade(data, sr, LOOP_CROSSFADE_SECONDS))
 
     this._noiseBuffers[name] = buffer
     return buffer
@@ -477,6 +479,28 @@ function shapeForLayer(samples: Float32Array, name: 'wind' | 'water', sampleRate
   return name === 'wind'
     ? applyOnePoleLowpass(samples, sampleRate, 1500)
     : applyGentleHighpass(samples, sampleRate, 800)
+}
+
+function applyLoopCrossfade(samples: Float32Array, sampleRate: number, fadeSeconds: number): Float32Array {
+  const out = new Float32Array(samples)
+  const fadeSamples = Math.min(
+    Math.floor(samples.length / 4),
+    Math.max(2, Math.floor(sampleRate * fadeSeconds)),
+  )
+  if (fadeSamples < 2) return out
+
+  const lastIndex = samples.length - 1
+  const tailStart = samples.length - fadeSamples
+  const seamValue = (samples[0] + samples[lastIndex]) * 0.5
+
+  // Pink noise is looped as a buffer; sharing a tiny boundary target removes the IIR reset edge without lifting RMS.
+  for (let i = 0; i < fadeSamples; i++) {
+    const t = i / (fadeSamples - 1)
+    out[i] = seamValue * (1 - t) + samples[i] * t
+    out[tailStart + i] = samples[tailStart + i] * (1 - t) + seamValue * t
+  }
+
+  return out
 }
 
 function applyOnePoleLowpass(samples: Float32Array, sampleRate: number, cutoffHz: number): Float32Array {
