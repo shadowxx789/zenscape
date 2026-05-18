@@ -81,6 +81,7 @@ export class AudioEngine {
   private _fading = false
 
   private _noiseBuffers: Partial<Record<'wind' | 'water', AudioBuffer>> = {}
+  private _noiseWarmupStarted = false
   private evolutionTimer: ReturnType<typeof setTimeout> | null = null
 
   // 一次性事件（M3）
@@ -128,6 +129,8 @@ export class AudioEngine {
     this.masterGain = this.ctx.createGain()
     this.masterGain.gain.value = this._masterVolume
     this.masterGain.connect(this.fadeGain)
+
+    setTimeout(() => this.warmupNoiseBuffers(), 0)
   }
 
   private async ensureRunning(): Promise<void> {
@@ -260,6 +263,7 @@ export class AudioEngine {
   dispose(): void {
     this.stopImmediate()
     this._noiseBuffers = {}
+    this._noiseWarmupStarted = false
     this.scheduler?.stop()
     this.scheduler = null
     this.oneShotPlayer = null
@@ -353,6 +357,13 @@ export class AudioEngine {
     const layer = this.layers.get(name)
     if (!layer || !this.ctx) return
     layer.panner.pan.setTargetAtTime(getLayerPan(name, this._spatialLevel, this.preset), this.ctx.currentTime, 0.2)
+  }
+
+  private warmupNoiseBuffers(): void {
+    if (this._noiseWarmupStarted || !this.ctx || !USE_PINK_NOISE) return
+    this._noiseWarmupStarted = true
+    this.getNoiseBuffer('wind')
+    this.getNoiseBuffer('water')
   }
 
   private getNoiseBuffer(name: 'wind' | 'water'): AudioBuffer {
@@ -477,8 +488,29 @@ function generatePinkNoise(length: number, sampleRate: number): Float32Array {
 function shapeForLayer(samples: Float32Array, name: 'wind' | 'water', sampleRate: number): Float32Array {
   // 1/f noise is the natural bed; wind tilts down like air through leaves, water keeps a gentler high band.
   return name === 'wind'
-    ? applyOnePoleLowpass(samples, sampleRate, 1500)
-    : applyGentleHighpass(samples, sampleRate, 800)
+    ? applyAirBandShape(samples, sampleRate)
+    : applyStreamBandShape(samples, sampleRate)
+}
+
+function applyAirBandShape(samples: Float32Array, sampleRate: number): Float32Array {
+  const deRumbled = applyGentleHighpass(samples, sampleRate, 200)
+  return applyOnePoleLowpass(
+    applyOnePoleLowpass(deRumbled, sampleRate, 1500),
+    sampleRate,
+    1800,
+  )
+}
+
+function applyStreamBandShape(samples: Float32Array, sampleRate: number): Float32Array {
+  const lifted = applyGentleHighpass(samples, sampleRate, 800)
+  const softened = applyOnePoleLowpass(lifted, sampleRate, 4800)
+  const out = new Float32Array(samples.length)
+
+  for (let i = 0; i < samples.length; i++) {
+    out[i] = lifted[i] * 0.65 + softened[i] * 0.35
+  }
+
+  return out
 }
 
 function applyLoopCrossfade(samples: Float32Array, sampleRate: number, fadeSeconds: number): Float32Array {

@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Task A.2 Runtime Test</title>
+    <style>
+      body {
+        background: #101614;
+        color: #edf3ec;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        padding: 24px;
+      }
+
+      button {
+        font: inherit;
+        padding: 10px 14px;
+      }
+
+      pre {
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <button id="run">Run Task A.2 runtime test</button>
+    <pre id="out">idle</pre>
+    <script type="module">
+      import { AudioEngine } from '../src/audio/AudioEngine.ts'
+
+      const out = document.querySelector('#out')
+
+      function wait(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms))
+      }
+
+      async function waitForWarmup(engine) {
+        const deadline = performance.now() + 2000
+        while (performance.now() < deadline) {
+          const buffers = engine._noiseBuffers
+          if (buffers.wind && buffers.water) return true
+          await wait(10)
+        }
+        return false
+      }
+
+      async function measurePlay(engine) {
+        const start = performance.now()
+        await engine.play()
+        const end = performance.now()
+        await wait(120)
+        engine.stopImmediate()
+        return end - start
+      }
+
+      document.querySelector('#run').addEventListener('click', async () => {
+        const results = {}
+
+        const cold = new AudioEngine()
+        let coldWarmups = 0
+        cold.warmupNoiseBuffers = () => {
+          coldWarmups += 1
+        }
+        cold.init()
+        await wait(30)
+        results.cold = {
+          playMs: await measurePlay(cold),
+          warmupCalls: coldWarmups,
+          cachedAfterPlay: Object.keys(cold._noiseBuffers),
+        }
+        cold.dispose()
+
+        const warm = new AudioEngine()
+        let warmupCalls = 0
+        const originalWarmup = warm.warmupNoiseBuffers.bind(warm)
+        const originalGetNoiseBuffer = warm.getNoiseBuffer.bind(warm)
+        const calls = []
+
+        warm.getNoiseBuffer = (name) => {
+          const hadCache = Boolean(warm._noiseBuffers[name])
+          const buffer = originalGetNoiseBuffer(name)
+          calls.push({ name, hadCache })
+          return buffer
+        }
+        warm.warmupNoiseBuffers = () => {
+          warmupCalls += 1
+          originalWarmup()
+        }
+
+        warm.init()
+        const warmupCompleted = await waitForWarmup(warm)
+        const callsBeforePlay = calls.length
+        results.warm = {
+          warmupCompleted,
+          warmupCalls,
+          cachedBeforePlay: Object.keys(warm._noiseBuffers),
+          playMs: await measurePlay(warm),
+          callsDuringPlay: calls.slice(callsBeforePlay),
+          allGetNoiseBufferCalls: calls,
+        }
+        warm.dispose()
+
+        out.textContent = JSON.stringify(results, null, 2)
+      })
+    </script>
+  </body>
+</html>
