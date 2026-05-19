@@ -21,14 +21,14 @@ const DEFAULT_OPTIONS: Required<OneShotOptions> = {
 
 export class OneShotPlayer {
   private ctx: AudioContext
-  private masterGain: GainNode
+  private eventBus: GainNode
   private spatialLevel = 0.3
   private instrumentLevel = 0.5
   private scale: PentatonicScale = 'C'
 
-  constructor(ctx: AudioContext, masterGain: GainNode) {
+  constructor(ctx: AudioContext, eventBus: GainNode) {
     this.ctx = ctx
-    this.masterGain = masterGain
+    this.eventBus = eventBus
   }
 
   setSpatialLevel(value: number): void {
@@ -73,7 +73,7 @@ export class OneShotPlayer {
     lpf.frequency.value = 800
     lpf.Q.value = 0.5
     lpf.connect(panner)
-    panner.connect(this.masterGain)
+    panner.connect(this.eventBus)
 
     this.addBellTone(lpf, 160, volume, 10.0, now)
     this.addBellTone(lpf, 320, volume * 0.10, 5.0, now)
@@ -96,7 +96,7 @@ export class OneShotPlayer {
     lpf.frequency.value = 1500
     lpf.Q.value = 0.5
     lpf.connect(panner)
-    panner.connect(this.masterGain)
+    panner.connect(this.eventBus)
 
     const freqs = getPentatonicFrequencies(this.scale)
     const baseFreq = freqs[Math.floor(Math.random() * freqs.length)]

@@ -7,7 +7,8 @@
  * - Drone（低频 oscillator）
  * - 钟声/古琴（OneShotPlayer + Scheduler 概率触发）
  *
- * 信号链：layers → masterGain → fadeGain → destination
+ * 信号链：layers/events → dry/event bus → masterGain → limiter → fadeGain → destination
+ * 并行湿声：dry/event bus → convolver → reverbGain → masterGain
  * fadeGain 负责播放/停止的淡入淡出（从 0 到 1）
  * masterGain 负责音量滑杆
  */
@@ -76,6 +77,13 @@ export class AudioEngine {
   private ctx: AudioContext | null = null
   private masterGain: GainNode | null = null
   private fadeGain: GainNode | null = null // 总线淡入淡出节点
+  private dryBus: GainNode | null = null
+  private eventBus: GainNode | null = null
+  private convolver: ConvolverNode | null = null
+  private reverbGain: GainNode | null = null
+  private drySend: GainNode | null = null
+  private eventSend: GainNode | null = null
+  private limiter: DynamicsCompressorNode | null = null
   private layers: Map<LayerName, ActiveLayer> = new Map()
   private _playing = false
   private _fading = false
@@ -95,11 +103,13 @@ export class AudioEngine {
   private _natureLevel = 0.7
   private _instrumentLevel = 0.5
   private _spatialLevel = 0.3
+  private _reverbWet = 0.25
 
   get playing() { return this._playing }
 
   setMode(mode: Mode): void {
     this.preset = getModePreset(mode).engine
+    this._reverbWet = this.preset.reverbWet
     this.oneShotPlayer?.setScale(this.preset.scale)
 
     if (!this.ctx) return
@@ -110,6 +120,7 @@ export class AudioEngine {
     this.applyLayerPan('water')
     this.applyLayerPan('drone')
     this.setBrightness(this._brightness)
+    this.setReverbWet(this.preset.reverbWet)
 
     const drone = this.layers.get('drone')?.source
     if (drone instanceof OscillatorNode) {
@@ -121,14 +132,54 @@ export class AudioEngine {
     if (this.ctx) return
     this.ctx = new AudioContext()
 
-    // 信号链：layers → masterGain → fadeGain → destination
+    // limiter catches combined dry and wet peaks before the global fade ramp.
     this.fadeGain = this.ctx.createGain()
     this.fadeGain.gain.value = 0 // 播放前静音
     this.fadeGain.connect(this.ctx.destination)
 
+    this.limiter = this.ctx.createDynamicsCompressor()
+    this.limiter.threshold.value = -6
+    this.limiter.knee.value = 2
+    this.limiter.ratio.value = 8
+    this.limiter.attack.value = 0.003
+    this.limiter.release.value = 0.25
+    this.limiter.connect(this.fadeGain)
+
     this.masterGain = this.ctx.createGain()
     this.masterGain.gain.value = this._masterVolume
-    this.masterGain.connect(this.fadeGain)
+    this.masterGain.connect(this.limiter)
+
+    this.convolver = this.ctx.createConvolver()
+    this.convolver.normalize = true
+
+    this.reverbGain = this.ctx.createGain()
+    this.reverbGain.gain.value = 0.25
+    this.convolver.connect(this.reverbGain)
+    this.reverbGain.connect(this.masterGain)
+
+    this.dryBus = this.ctx.createGain()
+    this.eventBus = this.ctx.createGain()
+    this.dryBus.connect(this.masterGain)
+    this.eventBus.connect(this.masterGain)
+
+    this.drySend = this.ctx.createGain()
+    this.drySend.gain.value = 1.0
+    this.dryBus.connect(this.drySend)
+    this.drySend.connect(this.convolver)
+
+    this.eventSend = this.ctx.createGain()
+    this.eventSend.gain.value = 1.5
+    this.eventBus.connect(this.eventSend)
+    this.eventSend.connect(this.convolver)
+
+    this.setReverbWet(this.preset.reverbWet)
+
+    const ctx = this.ctx
+    const convolver = this.convolver
+    queueMicrotask(() => {
+      if (this.ctx !== ctx || this.convolver !== convolver) return
+      convolver.buffer = generateMountainValleyIR(ctx, 6)
+    })
 
     setTimeout(() => this.warmupNoiseBuffers(), 0)
   }
@@ -175,6 +226,17 @@ export class AudioEngine {
     this.applyLayerPan('wind')
     this.applyLayerPan('water')
     this.applyLayerPan('drone')
+    this.setReverbWet(this._spatialLevel * 0.7 + 0.15)
+  }
+
+  setReverbWet(value: number): void {
+    this._reverbWet = clamp(value)
+    if (!this.ctx || !this.drySend || !this.eventSend) return
+
+    const drySendValue = 0.5 + this._reverbWet * 1.5
+    const eventSendValue = 0.8 + this._reverbWet * 2.5
+    this.drySend.gain.setTargetAtTime(drySendValue, this.ctx.currentTime, 0.1)
+    this.eventSend.gain.setTargetAtTime(eventSendValue, this.ctx.currentTime, 0.1)
   }
 
   /** 更新调度器参数（钟声/古琴概率） */
@@ -204,7 +266,7 @@ export class AudioEngine {
 
     // M3：启动调度器
     if (!this.oneShotPlayer) {
-      this.oneShotPlayer = new OneShotPlayer(ctx, this.masterGain!)
+      this.oneShotPlayer = new OneShotPlayer(ctx, this.eventBus!)
     }
     this.oneShotPlayer.setSpatialLevel(this._spatialLevel)
     this.oneShotPlayer.setInstrumentLevel(this._instrumentLevel)
@@ -267,6 +329,20 @@ export class AudioEngine {
     this.scheduler?.stop()
     this.scheduler = null
     this.oneShotPlayer = null
+    this.dryBus?.disconnect()
+    this.dryBus = null
+    this.eventBus?.disconnect()
+    this.eventBus = null
+    this.drySend?.disconnect()
+    this.drySend = null
+    this.eventSend?.disconnect()
+    this.eventSend = null
+    this.convolver?.disconnect()
+    this.convolver = null
+    this.reverbGain?.disconnect()
+    this.reverbGain = null
+    this.limiter?.disconnect()
+    this.limiter = null
     this.masterGain?.disconnect()
     this.masterGain = null
     this.fadeGain?.disconnect()
@@ -301,7 +377,7 @@ export class AudioEngine {
     source.connect(filter)
     filter.connect(panner)
     panner.connect(gain)
-    gain.connect(this.masterGain!)
+    gain.connect(this.dryBus!)
     source.start(now)
 
     this.layers.set(name, { source, filter, panner, gain, baseGain: layerGain, baseFilterFreq })
@@ -330,7 +406,7 @@ export class AudioEngine {
     osc.connect(filter)
     filter.connect(panner)
     panner.connect(gain)
-    gain.connect(this.masterGain!)
+    gain.connect(this.dryBus!)
     osc.start(now)
 
     this.layers.set(name, { source: osc, filter, panner, gain, baseGain: layerGain, baseFilterFreq: this.preset.droneFilter })
@@ -559,6 +635,41 @@ function applyGentleHighpass(samples: Float32Array, sampleRate: number, cutoffHz
   }
 
   return out
+}
+
+function generateMountainValleyIR(ctx: BaseAudioContext, durationSec = 6): AudioBuffer {
+  const sr = ctx.sampleRate
+  const length = Math.floor(sr * durationSec)
+  const ir = ctx.createBuffer(2, length, sr)
+  const preDelaySamples = Math.floor(sr * 0.08)
+
+  for (let ch = 0; ch < 2; ch++) {
+    const data = ir.getChannelData(ch)
+    let lpfState = 0
+
+    for (let i = 0; i < length; i++) {
+      if (i < preDelaySamples) {
+        data[i] = (Math.random() * 2 - 1) * 0.002
+        continue
+      }
+
+      const t = (i - preDelaySamples) / sr
+      const totalT = durationSec - 0.08
+      const envelope = Math.exp(-3.0 * t / totalT)
+      const noise = Math.random() * 2 - 1
+      const earlyReflection = t > 0.4 && t < 2.0 && Math.random() < 0.015
+        ? (Math.random() * 2 - 1) * 0.3
+        : 0
+
+      const raw = (noise * envelope + earlyReflection) * 0.5
+      const age = i / length
+      const alpha = 0.05 + age * 0.3
+      lpfState = raw * (1 - alpha) + lpfState * alpha
+      data[i] = lpfState
+    }
+  }
+
+  return ir
 }
 
 function getLayerPan(name: LayerName, spatialLevel: number, preset = getModePreset('meditate').engine): number {

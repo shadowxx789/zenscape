@@ -14,6 +14,7 @@ export type EnginePreset = {
   waterFilter: number
   windPan: number
   waterPan: number
+  reverbWet: number
   scale: PentatonicScale
 }
 
@@ -51,6 +52,7 @@ export const MODE_PRESETS: Record<Mode, ModePreset> = {
       waterFilter: 1900,
       windPan: -0.26,
       waterPan: 0.2,
+      reverbWet: 0.45,
       scale: 'C',
     },
   },
@@ -81,6 +83,7 @@ export const MODE_PRESETS: Record<Mode, ModePreset> = {
       waterFilter: 1450,
       windPan: -0.18,
       waterPan: 0.3,
+      reverbWet: 0.65,
       scale: 'G',
     },
   },
@@ -111,6 +114,7 @@ export const MODE_PRESETS: Record<Mode, ModePreset> = {
       waterFilter: 2400,
       windPan: -0.12,
       waterPan: 0.16,
+      reverbWet: 0.25,
       scale: 'D',
     },
   },
