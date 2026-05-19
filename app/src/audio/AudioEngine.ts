@@ -2,8 +2,8 @@
  * AudioEngine — ZenScape
  *
  * 多层混音 + 概率事件调度：
- * - 风（white noise + bandpass）
- * - 水（white noise + high bandpass）
+ * - 风（pink noise + air-band shaping）
+ * - 水（pink noise + stream-band shaping）
  * - Drone（低频 oscillator）
  * - 钟声/古琴（OneShotPlayer + Scheduler 概率触发）
  *
@@ -226,7 +226,9 @@ export class AudioEngine {
     this.applyLayerPan('wind')
     this.applyLayerPan('water')
     this.applyLayerPan('drone')
-    this.setReverbWet(this._spatialLevel * 0.7 + 0.15)
+    const base = this.preset.reverbWet
+    const offset = (this._spatialLevel - 0.5) * 0.3
+    this.setReverbWet(base + offset)
   }
 
   setReverbWet(value: number): void {
