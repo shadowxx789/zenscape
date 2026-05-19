@@ -25,7 +25,7 @@ Codex 实施（执行）
 
 ## 1. 文档使命
 
-把 ZenScape 从「能用的合成声景」升级到「可以戴上索尼 1000XM5 听 30 分钟不出戏」的工程标准。
+把 BreezeScape 从「能用的合成声景」升级到「可以戴上索尼 1000XM5 听 30 分钟不出戏」的工程标准。
 
 本 Sprint **不做**：
 - 不增加新模式
@@ -198,7 +198,7 @@ const breath = name === 'wind'
   ? 0.62 + 0.38 * Math.sin((i / sr) * 2 * Math.PI / 17 + Math.sin(i / sr / 11))
   : 0.82 + 0.18 * Math.sin((i / sr) * 2 * Math.PI / 9.5)
 ```
-这是 ZenScape 现有的好东西，**不要丢掉**。
+这是 BreezeScape 现有的好东西，**不要丢掉**。
 
 ### 4.5 文件改动清单
 
@@ -542,7 +542,7 @@ private playGuqinNote(freq: number, amp: number, pan: number, startTime: number)
 
 ### 7.1 为什么需要混响
 
-ZenScape 现有声景是**完全干**的。所有声音直接打到耳膜，听起来像在录音棚而不是在山谷里。
+BreezeScape 现有声景是**完全干**的。所有声音直接打到耳膜，听起来像在录音棚而不是在山谷里。
 
 **真实的"远山寺钟"** 的核心特征不是钟的音色，而是**钟声穿越空气、撞击山壁、回到你耳朵的混响轨迹**。
 
