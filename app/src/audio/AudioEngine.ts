@@ -1,5 +1,5 @@
 /**
- * AudioEngine — ZenScape
+ * AudioEngine — BreezeScape
  *
  * 多层混音 + 概率事件调度：
  * - 风（pink noise + air-band shaping）

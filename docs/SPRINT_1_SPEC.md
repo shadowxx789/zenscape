@@ -1,4 +1,4 @@
-# ZenScape Sprint 1 技术规格
+# BreezeScape Sprint 1 技术规格
 
 > **让声音对得起耳机**
 > Version 1.0 · 2026-05-17 · 目标受众：Codex / 自己 / 任何接手代码的人

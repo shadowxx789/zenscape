@@ -1,5 +1,5 @@
 /**
- * preferenceStore.ts — ZenScape M5
+ * preferenceStore.ts — BreezeScape M5
  *
  * 读写用户偏好到 localStorage。
  * 保存：模式、时长、五个滑杆值。

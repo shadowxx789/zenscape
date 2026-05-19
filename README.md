@@ -1,6 +1,6 @@
-# 禅音 ZenScape
+# 竹间息 BreezeScape
 
-> 即心是佛。
+> 竹间息 BreezeScape——风过竹林，声声不住，念念不停。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Live Demo](https://img.shields.io/badge/demo-online-brightgreen)](https://shadowxx789.github.io/zenscape/)

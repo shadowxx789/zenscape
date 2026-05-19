@@ -1,5 +1,5 @@
 /**
- * OneShotPlayer — ZenScape M3 (v3 修复)
+ * OneShotPlayer — BreezeScape M3 (v3 修复)
  *
  * 核心原则：所有声音从 0 线性渐起，绝不用 exponentialRamp 做 attack。
  * exponentialRamp 只用于 decay（从有到无），不做 attack（从无到有）。

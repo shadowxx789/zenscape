@@ -1,5 +1,5 @@
 /**
- * rules.ts — ZenScape M4 会话阶段与规则引擎
+ * rules.ts — BreezeScape M4 会话阶段与规则引擎
  *
  * 根据会话进度、模式、时间段自动计算声音参数。
  * 每 3-5 秒由 SessionView 调用一次，参数平滑推给 AudioEngine。

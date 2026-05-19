@@ -1,5 +1,5 @@
 /**
- * ParticleCanvas — ZenScape M6 禅意粒子艺术
+ * ParticleCanvas — BreezeScape M6 禅意粒子艺术
  *
  * Canvas 粒子系统：
  * - 播放时粒子缓慢流动，停止时淡出

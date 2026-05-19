@@ -1,5 +1,5 @@
 /**
- * Scheduler — ZenScape M3
+ * Scheduler — BreezeScape M3
  *
  * 概率事件调度器：
  * - 每 TICK_INTERVAL 秒检查一次

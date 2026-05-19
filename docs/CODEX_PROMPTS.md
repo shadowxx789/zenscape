@@ -1,4 +1,4 @@
-# ZenScape Sprint 1 — Codex Prompt 集合
+# BreezeScape Sprint 1 — Codex Prompt 集合
 
 > **开箱即用的提示词**
 > Version 1.0 · 2026-05-17 · 配合 `docs/SPRINT_1_SPEC.md` 使用
