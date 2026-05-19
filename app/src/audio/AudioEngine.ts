@@ -599,15 +599,14 @@ function applyLoopCrossfade(samples: Float32Array, sampleRate: number, fadeSecon
   )
   if (fadeSamples < 2) return out
 
-  const lastIndex = samples.length - 1
   const tailStart = samples.length - fadeSamples
-  const seamValue = (samples[0] + samples[lastIndex]) * 0.5
 
-  // Pink noise is looped as a buffer; sharing a tiny boundary target removes the IIR reset edge without lifting RMS.
   for (let i = 0; i < fadeSamples; i++) {
     const t = i / (fadeSamples - 1)
-    out[i] = seamValue * (1 - t) + samples[i] * t
-    out[tailStart + i] = samples[tailStart + i] * (1 - t) + seamValue * t
+    const fadeIn = Math.sin(t * Math.PI / 2)
+    const fadeOut = Math.cos(t * Math.PI / 2)
+    out[i] = samples[i] * fadeIn + samples[tailStart + i] * fadeOut
+    out[tailStart + i] = samples[tailStart + i] * fadeOut + samples[i] * fadeIn
   }
 
   return out
