@@ -120,6 +120,8 @@ export class AudioEngine {
     this.applyLayerPan('water')
     this.applyLayerPan('drone')
     this.setBrightness(this._brightness)
+    // TODO: setMode 切换时未重放 spatialLevel 对 reverbWet 的偏移，
+    // dryBus 与 reverbWet 在切换瞬间会短暂不一致。后续考虑统一处理。
     this.setReverbWet(this.preset.reverbWet)
 
     const drone = this.layers.get('drone')?.source
@@ -227,8 +229,12 @@ export class AudioEngine {
     this.applyLayerPan('water')
     this.applyLayerPan('drone')
     const base = this.preset.reverbWet
-    const offset = (this._spatialLevel - 0.5) * 0.3
+    const offset = (this._spatialLevel - 0.5) * 0.7
     this.setReverbWet(base + offset)
+    if (this.ctx && this.dryBus) {
+      const dryBusGain = 1 - this._spatialLevel * 0.25
+      this.dryBus.gain.setTargetAtTime(dryBusGain, this.ctx.currentTime, 0.1)
+    }
   }
 
   setReverbWet(value: number): void {
