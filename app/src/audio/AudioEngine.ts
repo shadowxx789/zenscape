@@ -116,13 +116,8 @@ export class AudioEngine {
     this.applyLayerGain('wind', this.getLayerGain('wind'))
     this.applyLayerGain('water', this.getLayerGain('water'))
     this.applyLayerGain('drone', this.getDroneGain())
-    this.applyLayerPan('wind')
-    this.applyLayerPan('water')
-    this.applyLayerPan('drone')
     this.setBrightness(this._brightness)
-    // TODO: setMode 切换时未重放 spatialLevel 对 reverbWet 的偏移，
-    // dryBus 与 reverbWet 在切换瞬间会短暂不一致。后续考虑统一处理。
-    this.setReverbWet(this.preset.reverbWet)
+    this.setSpatialLevel(this._spatialLevel)
 
     const drone = this.layers.get('drone')?.source
     if (drone instanceof OscillatorNode) {
