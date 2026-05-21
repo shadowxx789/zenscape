@@ -32,6 +32,16 @@ const BELL_PARTIALS = [
 const BELL_FUNDAMENTAL_RANGE: [number, number] = [115, 150]
 const PARTIAL_START_JITTER_MS: [number, number] = [0, 15]
 
+const GUQIN_PARAMS = {
+  decay: 0.995,
+  lpfCoefficient: 0.35,
+  durationSec: 8,
+  initialBurstSoftness: 1,
+}
+
+const HARMONIC_OVERTONE_PROB = 0.18
+const HARMONIC_DELAY_RANGE: [number, number] = [1.3, 2.8]
+
 export class OneShotPlayer {
   private ctx: AudioContext
   private eventBus: GainNode
@@ -102,30 +112,19 @@ export class OneShotPlayer {
   }
 
   /**
-   * 古琴泛音：
-   * - 400-500Hz 泛音
-   * - 300ms 线性渐起 → 指数衰减
+   * 古琴拨弦：
+   * Karplus-Strong 用短噪声脉冲模拟弦被拨动后的反馈衰减，
+   * 比 sine 叠加更接近“弦体先亮、随后木质共鸣留下”的听感。
    */
   private synthGuqin(now: number, volume: number, pan: number): void {
-    const ctx = this.ctx
-
-    const panner = ctx.createStereoPanner()
-    panner.pan.value = pan
-
-    const lpf = ctx.createBiquadFilter()
-    lpf.type = 'lowpass'
-    lpf.frequency.value = 1500
-    lpf.Q.value = 0.5
-    lpf.connect(panner)
-    panner.connect(this.eventBus)
-
     const freqs = getPentatonicFrequencies(this.scale)
     const baseFreq = freqs[Math.floor(Math.random() * freqs.length)]
-    this.addGuqinTone(lpf, baseFreq, volume * 0.72, rand(4.8, 7.2), now)
+    this.playGuqinNote(baseFreq, volume * 0.72, pan, now)
 
-    if (Math.random() < 0.18) {
+    if (Math.random() < HARMONIC_OVERTONE_PROB) {
       const secondFreq = freqs[Math.floor(Math.random() * freqs.length)]
-      this.addGuqinTone(lpf, secondFreq, volume * 0.34, rand(3.6, 5.6), now + rand(1.3, 2.8))
+      const delay = rand(HARMONIC_DELAY_RANGE[0], HARMONIC_DELAY_RANGE[1])
+      this.playGuqinNote(secondFreq, volume * 0.34, pan, now + delay)
     }
   }
 
@@ -159,34 +158,52 @@ export class OneShotPlayer {
   }
 
   /**
-   * 古琴音符：
-   * - 从 0 线性渐起 300ms
-   * - 到达峰值后缓慢衰减
+   * 单个古琴音符：
+   * 外层 50ms 线性 attack 兜住 buffer 起点，避免拨弦算法里的瞬态变成 click。
    */
-  private addGuqinTone(
-    dest: AudioNode,
+  private playGuqinNote(
     freq: number,
     volume: number,
-    decay: number,
-    now: number,
+    pan: number,
+    startTime: number,
   ): void {
     const ctx = this.ctx
-    const osc = ctx.createOscillator()
-    osc.type = 'sine'
-    osc.frequency.value = freq
+    const sr = ctx.sampleRate
+    const ksBuffer = renderKarplusStrong(
+      sr,
+      freq,
+      GUQIN_PARAMS.durationSec,
+      GUQIN_PARAMS.decay,
+      GUQIN_PARAMS.lpfCoefficient,
+      GUQIN_PARAMS.initialBurstSoftness,
+    )
+
+    const audioBuffer = ctx.createBuffer(1, ksBuffer.length, sr)
+    audioBuffer.copyToChannel(ksBuffer, 0)
+
+    const source = ctx.createBufferSource()
+    source.buffer = audioBuffer
+
+    const resonance = ctx.createBiquadFilter()
+    resonance.type = 'peaking'
+    resonance.frequency.value = 800
+    resonance.Q.value = 1.2
+    resonance.gain.value = 4
+
+    const panner = ctx.createStereoPanner()
+    panner.pan.value = pan
 
     const gain = ctx.createGain()
-    gain.gain.setValueAtTime(0, now)
-    gain.gain.setValueAtTime(0, now + 0.05)
-    gain.gain.linearRampToValueAtTime(volume, now + 0.05 + 0.3)
-    // 峰值后先保持一会儿再衰减
-    gain.gain.setValueAtTime(volume, now + 0.05 + 0.5)
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.05 + 0.5 + decay)
+    const sourceStart = startTime + 0.05
+    gain.gain.setValueAtTime(0, sourceStart)
+    gain.gain.linearRampToValueAtTime(volume, sourceStart + 0.05)
 
-    osc.connect(gain)
-    gain.connect(dest)
-    osc.start(now + 0.05)
-    osc.stop(now + 0.05 + 0.5 + decay + 0.1)
+    source.connect(resonance)
+    resonance.connect(panner)
+    panner.connect(gain)
+    gain.connect(this.eventBus)
+    source.start(sourceStart)
+    source.stop(sourceStart + GUQIN_PARAMS.durationSec + 0.1)
   }
 }
 
@@ -196,6 +213,48 @@ function rand(min: number, max: number): number {
 
 function clamp(v: number): number {
   return Math.max(0, Math.min(1, v))
+}
+
+function renderKarplusStrong(
+  sampleRate: number,
+  frequency: number,
+  durationSec: number,
+  decay: number,
+  lpfCoefficient: number,
+  initialBurstSoftness: number,
+): Float32Array<ArrayBuffer> {
+  const length = Math.floor(sampleRate * durationSec)
+  const period = Math.max(2, Math.floor(sampleRate / frequency))
+  const out = new Float32Array(length)
+  const delayLine = new Float32Array(period)
+
+  for (let i = 0; i < period; i += 1) {
+    delayLine[i] = Math.random() * 2 - 1
+  }
+
+  for (let pass = 0; pass < initialBurstSoftness; pass += 1) {
+    let prev = delayLine[period - 1]
+    for (let i = 0; i < period; i += 1) {
+      const softened = delayLine[i] * 0.5 + prev * 0.5
+      prev = delayLine[i]
+      delayLine[i] = softened
+    }
+  }
+
+  let readIdx = 0
+  let lpfState = 0
+  for (let i = 0; i < length; i += 1) {
+    const current = delayLine[readIdx]
+    const nextIdx = (readIdx + 1) % period
+    const averaged = (current + delayLine[nextIdx]) * 0.5
+
+    lpfState += (averaged - lpfState) * lpfCoefficient
+    delayLine[readIdx] = lpfState * decay
+    out[i] = current
+    readIdx = nextIdx
+  }
+
+  return out
 }
 
 function getPentatonicFrequencies(scale: PentatonicScale): number[] {
