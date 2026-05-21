@@ -424,7 +424,7 @@ export class AudioEngine {
   }
 
   private getDroneGain(): number {
-    const curve = 0.2 + this._instrumentLevel * 1.4
+    const curve = 0.2 + this._instrumentLevel * 0.6
     return curve * this.preset.droneGain
   }
 
