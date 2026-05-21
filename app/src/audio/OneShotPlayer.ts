@@ -19,6 +19,18 @@ const DEFAULT_OPTIONS: Required<OneShotOptions> = {
   panRange: [-0.5, 0.5],
 }
 
+const BELL_PARTIALS = [
+  { ratio: 1.000, decay: 10.0, amp: 1.00, attack: 0.30 },
+  { ratio: 2.000, decay: 7.5, amp: 0.42, attack: 0.25 },
+  { ratio: 2.760, decay: 4.2, amp: 0.22, attack: 0.20 },
+  { ratio: 5.404, decay: 2.5, amp: 0.10, attack: 0.15 },
+  { ratio: 8.933, decay: 1.4, amp: 0.05, attack: 0.10 },
+  { ratio: 13.345, decay: 0.8, amp: 0.025, attack: 0.08 },
+]
+
+const BELL_FUNDAMENTAL_RANGE: [number, number] = [135, 175]
+const PARTIAL_START_JITTER_MS: [number, number] = [0, 15]
+
 export class OneShotPlayer {
   private ctx: AudioContext
   private eventBus: GainNode
@@ -58,26 +70,34 @@ export class OneShotPlayer {
 
   /**
    * 远寺钟声：
-   * - 基频 160Hz，纯 sine
-   * - 300ms 线性渐起 → 指数衰减 10 秒
-   * - 低通 800Hz，非常闷，非常远
+   * 金属钟的壳体模态不是 1:2:3 谐波，而是非谐比例。
+   * 这些错开的分音让钟听起来像金属在山谷里衰减，而不是 sine 合唱。
    */
   private synthBell(now: number, volume: number, pan: number): void {
     const ctx = this.ctx
+    const fundamental = rand(BELL_FUNDAMENTAL_RANGE[0], BELL_FUNDAMENTAL_RANGE[1])
 
     const panner = ctx.createStereoPanner()
     panner.pan.value = pan
 
     const lpf = ctx.createBiquadFilter()
     lpf.type = 'lowpass'
-    lpf.frequency.value = 800
-    lpf.Q.value = 0.5
+    lpf.frequency.value = 2200
+    lpf.Q.value = 0.4
     lpf.connect(panner)
     panner.connect(this.eventBus)
 
-    this.addBellTone(lpf, 160, volume, 10.0, now)
-    this.addBellTone(lpf, 320, volume * 0.10, 5.0, now)
-    this.addBellTone(lpf, 480, volume * 0.03, 3.0, now)
+    for (const partial of BELL_PARTIALS) {
+      const startJitter = rand(PARTIAL_START_JITTER_MS[0], PARTIAL_START_JITTER_MS[1]) / 1000
+      this.addBellPartial(
+        lpf,
+        fundamental * partial.ratio,
+        volume * partial.amp,
+        partial.attack,
+        partial.decay,
+        now + 0.05 + startJitter,
+      )
+    }
   }
 
   /**
@@ -109,16 +129,17 @@ export class OneShotPlayer {
   }
 
   /**
-   * 钟声音符：
-   * - 从 0 线性渐起 300ms（绝不产生 click）
-   * - 到达峰值后指数衰减
+   * 钟声分音：
+   * - 50ms 启动偏移延续自旧实现，作为 attack ramp 之外的二重 click 防护
+   * - 分音自身从 0 线性渐起，再指数衰减
    */
-  private addBellTone(
+  private addBellPartial(
     dest: AudioNode,
     freq: number,
-    volume: number,
+    amp: number,
+    attack: number,
     decay: number,
-    now: number,
+    startTime: number,
   ): void {
     const ctx = this.ctx
     const osc = ctx.createOscillator()
@@ -126,17 +147,14 @@ export class OneShotPlayer {
     osc.frequency.value = freq
 
     const gain = ctx.createGain()
-    // 从 0 线性渐起，源延后启动避免 click
-    gain.gain.setValueAtTime(0, now)
-    gain.gain.setValueAtTime(0, now + 0.05)
-    gain.gain.linearRampToValueAtTime(volume, now + 0.05 + 0.3)
-    // 峰值后指数衰减
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.05 + 0.3 + decay)
+    gain.gain.setValueAtTime(0, startTime)
+    gain.gain.linearRampToValueAtTime(amp, startTime + attack)
+    gain.gain.exponentialRampToValueAtTime(0.0001, startTime + attack + decay)
 
     osc.connect(gain)
     gain.connect(dest)
-    osc.start(now + 0.05)
-    osc.stop(now + 0.05 + 0.3 + decay + 0.1)
+    osc.start(startTime)
+    osc.stop(startTime + attack + decay + 0.1)
   }
 
   /**
