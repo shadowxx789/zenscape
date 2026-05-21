@@ -20,7 +20,8 @@ const DEFAULT_OPTIONS: Required<OneShotOptions> = {
 }
 
 const BELL_PARTIALS = [
-  { ratio: 1.000, decay: 10.0, amp: 1.00, attack: 0.30 },
+  { ratio: 0.500, decay: 16.0, amp: 0.55, attack: 0.40 },
+  { ratio: 1.000, decay: 14.0, amp: 1.00, attack: 0.30 },
   { ratio: 2.000, decay: 7.5, amp: 0.42, attack: 0.25 },
   { ratio: 2.760, decay: 4.2, amp: 0.22, attack: 0.20 },
   { ratio: 5.404, decay: 2.5, amp: 0.10, attack: 0.15 },
@@ -28,7 +29,7 @@ const BELL_PARTIALS = [
   { ratio: 13.345, decay: 0.8, amp: 0.025, attack: 0.08 },
 ]
 
-const BELL_FUNDAMENTAL_RANGE: [number, number] = [135, 175]
+const BELL_FUNDAMENTAL_RANGE: [number, number] = [115, 150]
 const PARTIAL_START_JITTER_MS: [number, number] = [0, 15]
 
 export class OneShotPlayer {
