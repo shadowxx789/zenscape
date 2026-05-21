@@ -115,7 +115,7 @@ export function computeParams(
 
   // 调度器参数也随阶段变化
   const densityMod = phase === 'deep' ? 0.28 : phase === 'entering' ? 1.08 : phase === 'returning' ? 0.72 : 0.82
-  const eventMod = phase === 'deep' ? 0.25 : phase === 'entering' ? 1.0 : phase === 'returning' ? 0.62 : 0.78
+  const eventMod = phase === 'deep' ? 0.5 : phase === 'entering' ? 1.0 : phase === 'returning' ? 0.62 : 0.78
   const schedulerParams: SchedulerParams = {
     ...preset.scheduler,
     density: clamp(preset.scheduler.density * densityMod),

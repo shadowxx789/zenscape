@@ -35,7 +35,7 @@ export const MODE_PRESETS: Record<Mode, ModePreset> = {
     },
     scheduler: {
       density: 0.32,
-      bellProbability: 0.025,
+      bellProbability: 0.25,
       pluckProbability: 0.045,
       minEventGap: 24,
       bellMinGap: 85,
@@ -66,7 +66,7 @@ export const MODE_PRESETS: Record<Mode, ModePreset> = {
     },
     scheduler: {
       density: 0.18,
-      bellProbability: 0.012,
+      bellProbability: 0.12,
       pluckProbability: 0.01,
       minEventGap: 42,
       bellMinGap: 150,
@@ -97,7 +97,7 @@ export const MODE_PRESETS: Record<Mode, ModePreset> = {
     },
     scheduler: {
       density: 0.26,
-      bellProbability: 0.01,
+      bellProbability: 0.10,
       pluckProbability: 0.03,
       minEventGap: 34,
       bellMinGap: 120,
