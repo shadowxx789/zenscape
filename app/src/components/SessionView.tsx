@@ -32,6 +32,7 @@ export function SessionView({
   const [remaining, setRemaining] = useState(totalSeconds)
   const [isPlaying, setIsPlaying] = useState(false)
   const [isFinished, setIsFinished] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [sessionParams, setSessionParams] = useState<SoundParams>(initialSoundParams)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   // 用户手动调过的参数，规则引擎不再覆盖
@@ -67,7 +68,7 @@ export function SessionView({
       }, 1000)
     }
     return clearTimer
-  }, [isPlaying, clearTimer, remaining])
+  }, [isPlaying, clearTimer])
 
   // 卸载清理
   useEffect(() => {
@@ -120,8 +121,15 @@ export function SessionView({
       setIsPlaying(false)
       audioEngine.stop()
     } else {
-      setIsPlaying(true)
-      await audioEngine.play()
+      try {
+        setIsPlaying(true)
+        setErrorMessage(null)
+        await audioEngine.play()
+      } catch (err) {
+        setIsPlaying(false)
+        const msg = err instanceof Error ? err.message : '无法初始化音频，请检查浏览器设置'
+        setErrorMessage(msg)
+      }
     }
   }
 
@@ -136,6 +144,7 @@ export function SessionView({
     setRemaining(totalSeconds)
     setIsFinished(false)
     setIsPlaying(false)
+    setErrorMessage(null)
   }
 
   const handleParamChange = (key: keyof SoundParams, value: number) => {
@@ -187,6 +196,12 @@ export function SessionView({
         <p className="session-copy">风从竹林来。</p>
       ) : (
         <p className="session-copy">点击播放，让声音慢慢醒来。</p>
+      )}
+
+      {errorMessage && (
+        <p className="session-copy error-message" style={{ color: '#cc7a7a', fontSize: '0.9rem', marginTop: '0.5rem' }}>
+          {errorMessage}
+        </p>
       )}
 
       <div className="countdown" aria-label={`倒计时 ${formatTime(remaining)}`}>

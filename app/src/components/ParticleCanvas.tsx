@@ -36,11 +36,31 @@ export function ParticleCanvas({ isPlaying, brightness }: ParticleCanvasProps) {
   const animRef = useRef<number>(0)
   const globalOpacityRef = useRef(0)
 
+  const isPlayingRef = useRef(isPlaying)
+  const brightnessRef = useRef(brightness)
+
+  useEffect(() => {
+    isPlayingRef.current = isPlaying
+  }, [isPlaying])
+
+  useEffect(() => {
+    brightnessRef.current = brightness
+  }, [brightness])
+
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
+
+    const mediaQuery = typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null
+    let prefersReducedMotion = mediaQuery ? mediaQuery.matches : false
+    const handleMotionChange = (e: MediaQueryListEvent) => {
+      prefersReducedMotion = e.matches
+    }
+    if (mediaQuery) {
+      mediaQuery.addEventListener('change', handleMotionChange)
+    }
 
     // 尺寸
     const resize = () => {
@@ -60,7 +80,7 @@ export function ParticleCanvas({ isPlaying, brightness }: ParticleCanvasProps) {
       ctx.clearRect(0, 0, canvas.width, canvas.height)
 
       // 全局透明度：播放时渐入，停止时渐出
-      const targetGlobalOpacity = isPlaying ? 1 : 0
+      const targetGlobalOpacity = isPlayingRef.current ? 1 : 0
       globalOpacityRef.current += (targetGlobalOpacity - globalOpacityRef.current) * FADE_SPEED
 
       if (globalOpacityRef.current < 0.001) {
@@ -69,7 +89,7 @@ export function ParticleCanvas({ isPlaying, brightness }: ParticleCanvasProps) {
       }
 
       // 粒子数量随亮度调整
-      const targetCount = Math.floor(PARTICLE_COUNT * (0.5 + brightness * 0.5))
+      const targetCount = Math.floor(PARTICLE_COUNT * (0.5 + brightnessRef.current * 0.5))
       while (particlesRef.current.length < targetCount) {
         particlesRef.current.push(createParticle(canvas.width, canvas.height))
       }
@@ -80,8 +100,10 @@ export function ParticleCanvas({ isPlaying, brightness }: ParticleCanvasProps) {
       // 绘制
       for (const p of particlesRef.current) {
         // 移动
-        p.x += p.vx
-        p.y += p.vy
+        if (!prefersReducedMotion) {
+          p.x += p.vx
+          p.y += p.vy
+        }
 
         // 边界循环
         if (p.x < -10) p.x = canvas.width + 10
@@ -90,7 +112,7 @@ export function ParticleCanvas({ isPlaying, brightness }: ParticleCanvasProps) {
         if (p.y > canvas.height + 10) p.y = -10
 
         // 透明度随亮度调整
-        p.targetOpacity = 0.15 + brightness * 0.25
+        p.targetOpacity = 0.15 + brightnessRef.current * 0.25
         p.opacity += (p.targetOpacity - p.opacity) * 0.02
 
         // 绘制粒子
@@ -115,11 +137,26 @@ export function ParticleCanvas({ isPlaying, brightness }: ParticleCanvasProps) {
 
     animRef.current = requestAnimationFrame(animate)
 
+    const handleVisibility = () => {
+      if (document.hidden) {
+        cancelAnimationFrame(animRef.current)
+      } else {
+        cancelAnimationFrame(animRef.current)
+        animRef.current = requestAnimationFrame(animate)
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibility)
+
     return () => {
       cancelAnimationFrame(animRef.current)
       window.removeEventListener('resize', resize)
+      document.removeEventListener('visibilitychange', handleVisibility)
+      if (mediaQuery) {
+        mediaQuery.removeEventListener('change', handleMotionChange)
+      }
     }
-  }, [isPlaying, brightness])
+  }, [])
 
   return (
     <canvas
