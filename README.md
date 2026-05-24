@@ -140,10 +140,11 @@ Vite 8
 Web Audio API
 Canvas 2D (粒子)
 localStorage
+PWA (vite-plugin-pwa + Workbox)
 无后端，无账号，无依赖
 ```
 
-Web / PWA，纯静态部署。
+支持 PWA：可"添加到主屏幕"以独立 App 模式运行，离线可用。纯静态部署。
 
 ---
 
