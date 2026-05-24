@@ -74,12 +74,18 @@ export function SessionView({
     return () => { audioEngine.stopImmediate() }
   }, [])
 
+  // ref 持有最新的 remaining / totalSeconds，供规则引擎 tick 读取
+  const remainingRef = useRef(remaining)
+  useEffect(() => { remainingRef.current = remaining }, [remaining])
+  const totalSecondsRef = useRef(totalSeconds)
+  useEffect(() => { totalSecondsRef.current = totalSeconds }, [totalSeconds])
+
   // M4：规则引擎——每 4 秒根据进度重新计算参数
   useEffect(() => {
     if (!isPlaying || isFinished) return
 
     const tick = () => {
-      const progress = 1 - remaining / totalSeconds
+      const progress = 1 - remainingRef.current / totalSecondsRef.current
       const hour = new Date().getHours()
       const output = computeParams(mode, progress, {}, hour)
       // 只更新用户没手动调过的参数
@@ -96,7 +102,7 @@ export function SessionView({
     tick()
     const timer = setInterval(tick, 4000)
     return () => clearInterval(timer)
-  }, [isPlaying, isFinished, remaining, totalSeconds, mode])
+  }, [isPlaying, isFinished, mode])
 
   // 参数实时同步到 engine
   useEffect(() => {
