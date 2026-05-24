@@ -25,21 +25,34 @@ export const DEFAULT_PREFS: Preferences = {
   soundParams: { ...DEFAULT_PARAMS },
 }
 
+const VALID_MODES: Mode[] = ['meditate', 'sleep', 'focus']
+
+function isValidMode(m: unknown): m is Mode {
+  return typeof m === 'string' && VALID_MODES.includes(m as Mode)
+}
+
+function validateParam(v: unknown, fallback: number): number {
+  if (typeof v !== 'number' || isNaN(v)) return fallback
+  return Math.max(0, Math.min(1, v))
+}
+
 export function loadPreferences(): Preferences {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return { ...DEFAULT_PREFS }
     const parsed = JSON.parse(raw)
+
+    const soundParams = { ...DEFAULT_PARAMS }
+    if (parsed.soundParams && typeof parsed.soundParams === 'object') {
+      for (const key of Object.keys(DEFAULT_PARAMS) as (keyof SoundParams)[]) {
+        soundParams[key] = validateParam(parsed.soundParams[key], DEFAULT_PARAMS[key])
+      }
+    }
+
     return {
-      mode: typeof parsed.mode === 'string' ? parsed.mode : DEFAULT_PREFS.mode,
-      duration: typeof parsed.duration === 'number' ? parsed.duration : DEFAULT_PREFS.duration,
-      soundParams: {
-        masterVolume:    typeof parsed.soundParams?.masterVolume === 'number'    ? parsed.soundParams.masterVolume    : DEFAULT_PARAMS.masterVolume,
-        natureLevel:     typeof parsed.soundParams?.natureLevel === 'number'     ? parsed.soundParams.natureLevel     : DEFAULT_PARAMS.natureLevel,
-        instrumentLevel: typeof parsed.soundParams?.instrumentLevel === 'number' ? parsed.soundParams.instrumentLevel : DEFAULT_PARAMS.instrumentLevel,
-        spatialLevel:    typeof parsed.soundParams?.spatialLevel === 'number'    ? parsed.soundParams.spatialLevel    : DEFAULT_PARAMS.spatialLevel,
-        brightness:      typeof parsed.soundParams?.brightness === 'number'      ? parsed.soundParams.brightness      : DEFAULT_PARAMS.brightness,
-      },
+      mode: isValidMode(parsed.mode) ? parsed.mode : DEFAULT_PREFS.mode,
+      duration: typeof parsed.duration === 'number' && parsed.duration > 0 ? parsed.duration : DEFAULT_PREFS.duration,
+      soundParams,
     }
   } catch {
     return { ...DEFAULT_PREFS }

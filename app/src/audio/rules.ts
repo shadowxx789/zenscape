@@ -66,6 +66,10 @@ function getTimeModifier(hour: number): Partial<SoundParams> {
   if (hour >= 22 || hour < 5) {
     return { brightness: -0.15, masterVolume: -0.1 }
   }
+  // 傍晚与黄昏 (18-22)：柔和渐暗，微调音量
+  if (hour >= 18 && hour < 22) {
+    return { brightness: -0.06, masterVolume: -0.04 }
+  }
   // 清晨 (5-8)：稍微亮一点
   if (hour >= 5 && hour < 8) {
     return { brightness: +0.05 }

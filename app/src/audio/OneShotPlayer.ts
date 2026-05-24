@@ -109,6 +109,12 @@ export class OneShotPlayer {
         now + 0.05 + startJitter,
       )
     }
+
+    // 18 秒后（最长 decay 16s + 抖动和余量）清理共享的 lpf 和 panner 节点以防止内存与 DSP 泄露
+    setTimeout(() => {
+      try { lpf.disconnect() } catch { /* ignore */ }
+      try { panner.disconnect() } catch { /* ignore */ }
+    }, 18000)
   }
 
   /**
@@ -153,6 +159,12 @@ export class OneShotPlayer {
 
     osc.connect(gain)
     gain.connect(dest)
+
+    osc.onended = () => {
+      try { osc.disconnect() } catch { /* ignore */ }
+      try { gain.disconnect() } catch { /* ignore */ }
+    }
+
     osc.start(startTime)
     osc.stop(startTime + attack + decay + 0.1)
   }
@@ -202,6 +214,14 @@ export class OneShotPlayer {
     resonance.connect(panner)
     panner.connect(gain)
     gain.connect(this.eventBus)
+
+    source.onended = () => {
+      try { source.disconnect() } catch { /* ignore */ }
+      try { resonance.disconnect() } catch { /* ignore */ }
+      try { panner.disconnect() } catch { /* ignore */ }
+      try { gain.disconnect() } catch { /* ignore */ }
+    }
+
     source.start(sourceStart)
     source.stop(sourceStart + GUQIN_PARAMS.durationSec + 0.1)
   }

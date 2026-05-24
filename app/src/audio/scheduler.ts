@@ -69,6 +69,14 @@ export class Scheduler {
     this.params = { ...this.params, ...params }
   }
 
+  private handleVisibilityChange = (): void => {
+    if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+      if (this.timer) {
+        this.scheduleNext()
+      }
+    }
+  }
+
   /** 启动调度 */
   start(): void {
     if (this.timer) return
@@ -78,6 +86,10 @@ export class Scheduler {
     this.lastByType.temple_bell = now
     this.lastByType.guqin_harmonic = now
     this.scheduleNext(this.params.firstEventDelay ?? DEFAULT_SCHEDULER_PARAMS.firstEventDelay!)
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', this.handleVisibilityChange)
+    }
   }
 
   /** 停止调度 */
@@ -85,6 +97,9 @@ export class Scheduler {
     if (this.timer) {
       clearTimeout(this.timer)
       this.timer = null
+    }
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', this.handleVisibilityChange)
     }
   }
 

@@ -87,6 +87,7 @@ export class AudioEngine {
   private layers: Map<LayerName, ActiveLayer> = new Map()
   private _playing = false
   private _fading = false
+  private _fadeToken = 0
 
   private _noiseBuffers: Partial<Record<'wind' | 'water', AudioBuffer>> = {}
   private _noiseWarmupStarted = false
@@ -104,12 +105,15 @@ export class AudioEngine {
   private _instrumentLevel = 0.5
   private _spatialLevel = 0.3
   private _reverbWet = 0.25
+  private _currentMode: Mode | null = null
 
   get playing() { return this._playing }
 
   setMode(mode: Mode): void {
+    if (this._currentMode === mode) return
+    this._currentMode = mode
     this.preset = getModePreset(mode).engine
-    this._reverbWet = this.preset.reverbWet
+    this.setReverbWet(this.preset.reverbWet)
     this.oneShotPlayer?.setScale(this.preset.scale)
 
     if (!this.ctx) return
@@ -127,7 +131,11 @@ export class AudioEngine {
 
   init(): void {
     if (this.ctx) return
-    this.ctx = new AudioContext()
+    const AudioCtx = typeof window !== 'undefined' && (window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext)
+    if (!AudioCtx) {
+      throw new Error('当前浏览器不支持 Web Audio API，请尝试使用 Chrome 或 Safari')
+    }
+    this.ctx = new AudioCtx()
 
     // limiter catches combined dry and wet peaks before the global fade ramp.
     this.fadeGain = this.ctx.createGain()
@@ -170,45 +178,50 @@ export class AudioEngine {
     this.eventSend.connect(this.convolver)
 
     this.setReverbWet(this.preset.reverbWet)
-
-    const ctx = this.ctx
-    const convolver = this.convolver
-    queueMicrotask(() => {
-      if (this.ctx !== ctx || this.convolver !== convolver) return
-      convolver.buffer = generateMountainValleyIR(ctx, 6)
-    })
+    this.convolver.buffer = generateMountainValleyIR(this.ctx, 6)
 
     setTimeout(() => this.warmupNoiseBuffers(), 0)
   }
 
   private async ensureRunning(): Promise<void> {
     if (!this.ctx) this.init()
-    if (this.ctx!.state === 'suspended') await this.ctx!.resume()
+    if (!this.ctx) {
+      throw new Error('当前浏览器不支持 Web Audio API，请尝试使用 Chrome 或 Safari')
+    }
+    if (this.ctx.state === 'suspended') await this.ctx.resume()
   }
 
   // — 参数接口 —
 
   setMasterVolume(value: number): void {
-    this._masterVolume = clamp(value)
+    const clamped = clamp(value)
+    if (this._masterVolume === clamped) return
+    this._masterVolume = clamped
     if (this.ctx && this.masterGain) {
       this.masterGain.gain.setTargetAtTime(this._masterVolume, this.ctx.currentTime, 0.05)
     }
   }
 
   setNatureLevel(value: number): void {
-    this._natureLevel = clamp(value)
+    const clamped = clamp(value)
+    if (this._natureLevel === clamped) return
+    this._natureLevel = clamped
     this.applyLayerGain('wind', this.getLayerGain('wind'))
     this.applyLayerGain('water', this.getLayerGain('water'))
   }
 
   setInstrumentLevel(value: number): void {
-    this._instrumentLevel = clamp(value)
+    const clamped = clamp(value)
+    if (this._instrumentLevel === clamped) return
+    this._instrumentLevel = clamped
     this.applyLayerGain('drone', this.getDroneGain())
     this.oneShotPlayer?.setInstrumentLevel(this._instrumentLevel)
   }
 
   setBrightness(value: number): void {
-    this._brightness = clamp(value)
+    const clamped = clamp(value)
+    if (this._brightness === clamped) return
+    this._brightness = clamped
     if (!this.ctx) return
     const now = this.ctx.currentTime
     for (const layer of this.layers.values()) {
@@ -218,7 +231,9 @@ export class AudioEngine {
   }
 
   setSpatialLevel(value: number): void {
-    this._spatialLevel = clamp(value)
+    const clamped = clamp(value)
+    if (this._spatialLevel === clamped) return
+    this._spatialLevel = clamped
     this.oneShotPlayer?.setSpatialLevel(this._spatialLevel)
     this.applyLayerPan('wind')
     this.applyLayerPan('water')
@@ -295,13 +310,17 @@ export class AudioEngine {
     this.fadeGain!.gain.setValueAtTime(this.fadeGain!.gain.value, now)
     this.fadeGain!.gain.linearRampToValueAtTime(0, now + FADE_DURATION)
 
+    const token = ++this._fadeToken
     setTimeout(() => {
+      if (this._fadeToken !== token) return
       this.stopImmediate()
       this._fading = false
     }, FADE_DURATION * 1000)
   }
 
   stopImmediate(): void {
+    this._fadeToken++
+    this._fading = false
     this.scheduler?.stop()
     if (this.evolutionTimer) {
       clearTimeout(this.evolutionTimer)
@@ -316,10 +335,10 @@ export class AudioEngine {
 
     for (const [, layer] of this.layers) {
       try { layer.source.stop() } catch { /* already stopped */ }
-      layer.source.disconnect()
-      layer.filter.disconnect()
-      layer.panner.disconnect()
-      layer.gain.disconnect()
+      try { layer.source.disconnect() } catch { /* ignore */ }
+      try { layer.filter.disconnect() } catch { /* ignore */ }
+      try { layer.panner.disconnect() } catch { /* ignore */ }
+      try { layer.gain.disconnect() } catch { /* ignore */ }
     }
     this.layers.clear()
     this._playing = false
@@ -332,25 +351,25 @@ export class AudioEngine {
     this.scheduler?.stop()
     this.scheduler = null
     this.oneShotPlayer = null
-    this.dryBus?.disconnect()
+    try { this.dryBus?.disconnect() } catch { /* ignore */ }
     this.dryBus = null
-    this.eventBus?.disconnect()
+    try { this.eventBus?.disconnect() } catch { /* ignore */ }
     this.eventBus = null
-    this.drySend?.disconnect()
+    try { this.drySend?.disconnect() } catch { /* ignore */ }
     this.drySend = null
-    this.eventSend?.disconnect()
+    try { this.eventSend?.disconnect() } catch { /* ignore */ }
     this.eventSend = null
-    this.convolver?.disconnect()
+    try { this.convolver?.disconnect() } catch { /* ignore */ }
     this.convolver = null
-    this.reverbGain?.disconnect()
+    try { this.reverbGain?.disconnect() } catch { /* ignore */ }
     this.reverbGain = null
-    this.limiter?.disconnect()
+    try { this.limiter?.disconnect() } catch { /* ignore */ }
     this.limiter = null
-    this.masterGain?.disconnect()
+    try { this.masterGain?.disconnect() } catch { /* ignore */ }
     this.masterGain = null
-    this.fadeGain?.disconnect()
+    try { this.fadeGain?.disconnect() } catch { /* ignore */ }
     this.fadeGain = null
-    this.ctx?.close()
+    try { this.ctx?.close() } catch { /* ignore */ }
     this.ctx = null
   }
 
