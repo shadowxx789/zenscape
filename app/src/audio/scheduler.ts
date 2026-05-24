@@ -3,9 +3,9 @@
  *
  * 概率事件调度器：
  * - 每 TICK_INTERVAL 秒检查一次
- * - 基于 probability 决定是否触发事件
+ * - density 决定本次 tick 是否触发任意事件
+ * - probability 字段作为候选事件的相对选择权重
  * - 支持最小事件间隔（避免太密集）
- * - density 参数控制整体事件频率
  * - 暂停时停止，恢复时继续
  */
 
@@ -14,11 +14,11 @@ import { OneShotPlayer } from './OneShotPlayer'
 export type EventType = 'temple_bell' | 'guqin_harmonic'
 
 export interface SchedulerParams {
-  /** 总体密度 (0-1)，影响 tick 间隔的检查概率 */
+  /** 总体密度 (0-1)，控制 tick 中尝试触发任意事件的概率 */
   density: number
-  /** 钟声触发概率 (0-0.12) */
+  /** 钟声选择权重；总事件频率由 density 控制 */
   bellProbability: number
-  /** 古琴触发概率 (0-0.18) */
+  /** 古琴选择权重；总事件频率由 density 控制 */
   pluckProbability: number
   /** 任意两个事件之间的最小间隔（秒） */
   minEventGap?: number
@@ -42,6 +42,11 @@ export const DEFAULT_SCHEDULER_PARAMS: SchedulerParams = {
   bellMinGap: 85,
   pluckMinGap: 55,
   firstEventDelay: 18,
+}
+
+type WeightedEvent = {
+  type: EventType
+  weight: number
 }
 
 export class Scheduler {
@@ -102,38 +107,49 @@ export class Scheduler {
       return
     }
 
-    // density 影响整体触发意愿
+    // density 是总闸门；通过后再在满足 minGap 的候选事件中按权重选择。
     if (Math.random() > this.params.density) {
       this.scheduleNext()
       return
     }
 
-    // 逐个事件类型判断
-    const roll = Math.random()
-
-    // 钟声
-    if (
-      roll < this.params.bellProbability &&
-      now - this.lastByType.temple_bell >= (this.params.bellMinGap ?? 85)
-    ) {
-      this.player.play('temple_bell')
+    const event = this.pickEvent(now)
+    if (event) {
+      this.player.play(event)
       this.lastEventTime = now
-      this.lastByType.temple_bell = now
-      this.scheduleNext()
-      return
-    }
-
-    // 古琴
-    if (
-      roll < this.params.bellProbability + this.params.pluckProbability &&
-      now - this.lastByType.guqin_harmonic >= (this.params.pluckMinGap ?? 55)
-    ) {
-      this.player.play('guqin_harmonic')
-      this.lastEventTime = now
-      this.lastByType.guqin_harmonic = now
+      this.lastByType[event] = now
     }
 
     this.scheduleNext()
+  }
+
+  private pickEvent(now: number): EventType | null {
+    const candidates: WeightedEvent[] = []
+
+    if (
+      this.params.bellProbability > 0 &&
+      now - this.lastByType.temple_bell >= (this.params.bellMinGap ?? 85)
+    ) {
+      candidates.push({ type: 'temple_bell', weight: this.params.bellProbability })
+    }
+
+    if (
+      this.params.pluckProbability > 0 &&
+      now - this.lastByType.guqin_harmonic >= (this.params.pluckMinGap ?? 55)
+    ) {
+      candidates.push({ type: 'guqin_harmonic', weight: this.params.pluckProbability })
+    }
+
+    const totalWeight = candidates.reduce((sum, candidate) => sum + candidate.weight, 0)
+    if (totalWeight <= 0) return null
+
+    let pick = Math.random() * totalWeight
+    for (const candidate of candidates) {
+      pick -= candidate.weight
+      if (pick <= 0) return candidate.type
+    }
+
+    return candidates[candidates.length - 1]?.type ?? null
   }
 
   private scheduleNext(delaySeconds = rand(TICK_MIN, TICK_MAX)): void {
