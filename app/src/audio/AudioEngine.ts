@@ -126,6 +126,22 @@ export class AudioEngine {
     return this._diagnostics
   }
 
+  // ─────────────────────────────────────────────────────────
+  // TEMP DEBUG ACCESSORS — Phase 1 Pre-Flight Experiment
+  // 仅用于 docs/PHASE1_EXPERIMENT.md 中的手动验证脚本。
+  // 实验完成后必须移除。请勿在生产代码或 UI 中引用这些 getter。
+  // 实验执行日期: 2026-05-25
+  // ─────────────────────────────────────────────────────────
+  /** @internal experiment-only */
+  get _debugEventBus(): GainNode | null { return this.eventBus }
+  /** @internal experiment-only */
+  get _debugDryBus(): GainNode | null { return this.dryBus }
+  /** @internal experiment-only */
+  get _debugMasterGain(): GainNode | null { return this.masterGain }
+  /** @internal experiment-only */
+  get _debugLimiter(): DynamicsCompressorNode | null { return this.limiter }
+  // ─────────────────────────────────────────────────────────
+
   /** 立即触发一个 one-shot 事件（绕过调度器，仅 dev 用） */
   triggerEvent(type: 'temple_bell' | 'guqin_harmonic'): void {
     if (!this.oneShotPlayer || !this._playing) {
