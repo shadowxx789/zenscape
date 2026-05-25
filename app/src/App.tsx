@@ -9,6 +9,7 @@ import { getModePreset } from './audio/soundscapes'
 import { loadPreferences, resetPreferences, savePreferences } from './storage/preferenceStore'
 import heroImage from './assets/zen-bamboo-stream.jpg'
 import './App.css'
+import { DiagnosticsPanel } from './components/DiagnosticsPanel'
 
 // 启动时加载保存的偏好
 const saved = loadPreferences()
@@ -36,47 +37,48 @@ function App() {
     setSoundParams(getModePreset(nextMode).sound)
   }
 
-  if (isSessionActive) {
-    return (
-      <SessionView
-        mode={mode}
-        duration={duration}
-        soundParams={soundParams}
-        onSoundParamsChange={setSoundParams}
-        onReturn={() => setIsSessionActive(false)}
-      />
-    )
-  }
-
   return (
-    <main className="home-view">
-      <section className="hero-panel" aria-labelledby="app-title">
-        <img className="hero-image" src={heroImage} alt="" aria-hidden="true" />
-        <div className="hero-content">
-          <p className="section-kicker">BreezeScape</p>
-          <h1 id="app-title">竹间息 BreezeScape</h1>
-          <p className="hero-copy">
-            选择一个场景，让风、水、钟与古琴慢慢生成一段不急着结束的安静。
-          </p>
-        </div>
-      </section>
+    <>
+      {isSessionActive ? (
+        <SessionView
+          mode={mode}
+          duration={duration}
+          soundParams={soundParams}
+          onSoundParamsChange={setSoundParams}
+          onReturn={() => setIsSessionActive(false)}
+        />
+      ) : (
+        <main className="home-view">
+          <section className="hero-panel" aria-labelledby="app-title">
+            <img className="hero-image" src={heroImage} alt="" aria-hidden="true" />
+            <div className="hero-content">
+              <p className="section-kicker">BreezeScape</p>
+              <h1 id="app-title">竹间息 BreezeScape</h1>
+              <p className="hero-copy">
+                选择一个场景，让风、水、钟与古琴慢慢生成一段不急着结束的安静。
+              </p>
+            </div>
+          </section>
 
-      <div className="setup-stack">
-        <ModeSelector value={mode} onChange={handleModeChange} />
-        <DurationSelector value={duration} onChange={setDuration} />
-        <SoundControls params={soundParams} onChange={setSoundParams} />
-      </div>
+          <div className="setup-stack">
+            <ModeSelector value={mode} onChange={handleModeChange} />
+            <DurationSelector value={duration} onChange={setDuration} />
+            <SoundControls params={soundParams} onChange={setSoundParams} />
+          </div>
 
-      <div className="home-actions">
-        <button type="button" className="ghost-action reset-button" onClick={handleResetPreferences}>
-          恢复默认
-        </button>
+          <div className="home-actions">
+            <button type="button" className="ghost-action reset-button" onClick={handleResetPreferences}>
+              恢复默认
+            </button>
 
-        <button type="button" className="start-button" onClick={() => setIsSessionActive(true)}>
-          开始声景
-        </button>
-      </div>
-    </main>
+            <button type="button" className="start-button" onClick={() => setIsSessionActive(true)}>
+              开始声景
+            </button>
+          </div>
+        </main>
+      )}
+      <DiagnosticsPanel />
+    </>
   )
 }
 

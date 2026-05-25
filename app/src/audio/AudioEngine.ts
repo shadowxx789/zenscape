@@ -74,6 +74,13 @@ interface ActiveLayer {
 
 export type LayerName = 'wind' | 'water' | 'drone'
 
+export interface RecentEvent {
+  time: number      // performance.now() 时间戳
+  type: 'temple_bell' | 'guqin_harmonic'
+  volume: number    // 当时的 instrumentLevel
+  pan: number       // [-1, 1]
+}
+
 export class AudioEngine {
   private ctx: AudioContext | null = null
   private masterGain: GainNode | null = null
@@ -108,11 +115,69 @@ export class AudioEngine {
   private _reverbWet = 0.25
   private _currentMode: Mode | null = null
   private _diagnostics: AudioDiagnostics | null = null
+  private _recentEvents: RecentEvent[] = []
+  private _ambientMuted = false
+  private _eventsSolo = false
+  private _preMuteAmbientGains: Map<LayerName, number> = new Map()
 
   get playing() { return this._playing }
 
   get diagnostics(): AudioDiagnostics | null {
     return this._diagnostics
+  }
+
+  /** 立即触发一个 one-shot 事件（绕过调度器，仅 dev 用） */
+  triggerEvent(type: 'temple_bell' | 'guqin_harmonic'): void {
+    if (!this.oneShotPlayer || !this._playing) {
+      console.warn('[AudioEngine] triggerEvent ignored: not playing')
+      return
+    }
+    this.oneShotPlayer.play(type)
+  }
+
+  /** 静音 ambient 层（wind/water/drone），不影响 event */
+  muteAmbient(muted: boolean): void {
+    if (!this.ctx) return
+    if (muted === this._ambientMuted) return
+    this._ambientMuted = muted
+    const now = this.ctx.currentTime
+
+    for (const [name, layer] of this.layers) {
+      if (muted) {
+        this._preMuteAmbientGains.set(name, layer.gain.gain.value)
+        layer.gain.gain.setTargetAtTime(0, now, 0.05)
+      } else {
+        const restored = this._preMuteAmbientGains.get(name) ?? layer.baseGain
+        layer.gain.gain.setTargetAtTime(restored, now, 0.05)
+      }
+    }
+  }
+
+  /** Solo event 层：静音 ambient，等价于 muteAmbient(true) */
+  soloEvents(solo: boolean): void {
+    this._eventsSolo = solo
+    this.muteAmbient(solo)
+  }
+
+  /** 读取最近的事件（最多 20 个，最新在前） */
+  getRecentEvents(): RecentEvent[] {
+    return [...this._recentEvents]
+  }
+
+  /** 当前 mute/solo 状态 */
+  get ambientMuted(): boolean { return this._ambientMuted }
+  get eventsSolo(): boolean { return this._eventsSolo }
+
+  private _recordEvent(type: 'temple_bell' | 'guqin_harmonic'): void {
+    this._recentEvents.unshift({
+      time: performance.now(),
+      type,
+      volume: this._instrumentLevel,
+      pan: 0,
+    })
+    if (this._recentEvents.length > 20) {
+      this._recentEvents.length = 20
+    }
   }
 
   setMode(mode: Mode): void {
@@ -299,6 +364,12 @@ export class AudioEngine {
     // M3：启动调度器
     if (!this.oneShotPlayer) {
       this.oneShotPlayer = new OneShotPlayer(ctx, this.eventBus!)
+      // 包装 play 方法以记录所有事件（含调度器触发的与手动触发的）
+      const originalPlay = this.oneShotPlayer.play.bind(this.oneShotPlayer)
+      this.oneShotPlayer.play = (type, opts) => {
+        this._recordEvent(type)
+        originalPlay(type, opts)
+      }
     }
     this.oneShotPlayer.setSpatialLevel(this._spatialLevel)
     this.oneShotPlayer.setInstrumentLevel(this._instrumentLevel)
