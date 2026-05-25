@@ -17,6 +17,7 @@ import { OneShotPlayer } from './OneShotPlayer'
 import { Scheduler, type SchedulerParams } from './scheduler'
 import { getModePreset, type EnginePreset } from './soundscapes'
 import type { Mode } from '../types'
+import { AudioDiagnostics } from './AudioDiagnostics'
 
 const FADE_DURATION = 3
 const BUFFER_SECONDS = 61
@@ -106,8 +107,13 @@ export class AudioEngine {
   private _spatialLevel = 0.3
   private _reverbWet = 0.25
   private _currentMode: Mode | null = null
+  private _diagnostics: AudioDiagnostics | null = null
 
   get playing() { return this._playing }
+
+  get diagnostics(): AudioDiagnostics | null {
+    return this._diagnostics
+  }
 
   setMode(mode: Mode): void {
     if (this._currentMode === mode) return
@@ -179,6 +185,14 @@ export class AudioEngine {
 
     this.setReverbWet(this.preset.reverbWet)
     this.convolver.buffer = generateMountainValleyIR(this.ctx, 6)
+
+    // Diagnostics：在所有关键 bus 上挂探针，供 DevPanel 实时读取
+    this._diagnostics = new AudioDiagnostics(this.ctx)
+    this._diagnostics.attachProbe('master', this.masterGain)
+    this._diagnostics.attachProbe('dryBus', this.dryBus)
+    this._diagnostics.attachProbe('eventBus', this.eventBus)
+    this._diagnostics.attachProbe('reverbGain', this.reverbGain)
+    this._diagnostics.attachProbe('limiter', this.limiter)
 
     setTimeout(() => this.warmupNoiseBuffers(), 0)
   }
@@ -346,6 +360,8 @@ export class AudioEngine {
 
   dispose(): void {
     this.stopImmediate()
+    this._diagnostics?.dispose()
+    this._diagnostics = null
     this._noiseBuffers = {}
     this._noiseWarmupStarted = false
     this.scheduler?.stop()
@@ -709,3 +725,7 @@ function rand(min: number, max: number): number {
 
 /** 全局单例 */
 export const audioEngine = new AudioEngine()
+
+if (typeof window !== 'undefined') {
+  (window as unknown as { audioEngine: AudioEngine }).audioEngine = audioEngine
+}
