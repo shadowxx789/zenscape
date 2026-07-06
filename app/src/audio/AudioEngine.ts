@@ -7,8 +7,13 @@
  * - Drone（低频 oscillator）
  * - 钟声/古琴（OneShotPlayer + Scheduler 概率触发）
  *
- * 信号链：layers/events → dry/event bus → masterGain → limiter → fadeGain → destination
- * 并行湿声：dry/event bus → convolver → reverbGain → masterGain
+ * 信号链：
+ * layers → ambientBus ─┬→ masterGain (干声)
+ *                      └→ ambientReverbSend → ambientConvolver → ambientReverbGain → masterGain (湿声)
+ * events → eventBus → eventTrim ─┬→ masterGain (干声)
+ *                                └→ eventReverbSend → eventConvolver → eventReverbGain → masterGain (湿声)
+ * masterGain → limiter → fadeGain → destination
+ *
  * fadeGain 负责播放/停止的淡入淡出（从 0 到 1）
  * masterGain 负责音量滑杆
  */
@@ -85,12 +90,15 @@ export class AudioEngine {
   private ctx: AudioContext | null = null
   private masterGain: GainNode | null = null
   private fadeGain: GainNode | null = null // 总线淡入淡出节点
-  private dryBus: GainNode | null = null
+  private ambientBus: GainNode | null = null
   private eventBus: GainNode | null = null
-  private convolver: ConvolverNode | null = null
-  private reverbGain: GainNode | null = null
-  private drySend: GainNode | null = null
-  private eventSend: GainNode | null = null
+  private ambientReverbSend: GainNode | null = null
+  private ambientConvolver: ConvolverNode | null = null
+  private ambientReverbGain: GainNode | null = null
+  private eventReverbSend: GainNode | null = null
+  private eventConvolver: ConvolverNode | null = null
+  private eventReverbGain: GainNode | null = null
+  private eventTrim: GainNode | null = null
   private limiter: DynamicsCompressorNode | null = null
   private layers: Map<LayerName, ActiveLayer> = new Map()
   private _playing = false
@@ -207,56 +215,86 @@ export class AudioEngine {
       throw new Error('当前浏览器不支持 Web Audio API，请尝试使用 Chrome 或 Safari')
     }
     this.ctx = new AudioCtx()
+    const ctx = this.ctx
 
-    // limiter catches combined dry and wet peaks before the global fade ramp.
-    this.fadeGain = this.ctx.createGain()
-    this.fadeGain.gain.value = 0 // 播放前静音
-    this.fadeGain.connect(this.ctx.destination)
+    // ───── 1. 输出链（destination 向上构建）─────
+    this.fadeGain = ctx.createGain()
+    this.fadeGain.gain.value = 0
+    this.fadeGain.connect(ctx.destination)
 
-    this.limiter = this.ctx.createDynamicsCompressor()
-    this.limiter.threshold.value = -6
-    this.limiter.knee.value = 2
-    this.limiter.ratio.value = 8
-    this.limiter.attack.value = 0.003
-    this.limiter.release.value = 0.25
+    // Brickwall limiter — 仅做防爆，不做音量塑形
+    this.limiter = ctx.createDynamicsCompressor()
+    this.limiter.threshold.value = -1.0
+    this.limiter.knee.value = 0
+    this.limiter.ratio.value = 20
+    this.limiter.attack.value = 0.001
+    this.limiter.release.value = 0.10
     this.limiter.connect(this.fadeGain)
 
-    this.masterGain = this.ctx.createGain()
+    this.masterGain = ctx.createGain()
     this.masterGain.gain.value = this._masterVolume
     this.masterGain.connect(this.limiter)
 
-    this.convolver = this.ctx.createConvolver()
-    this.convolver.normalize = true
+    // ───── 2. Ambient 路径 ─────
+    this.ambientBus = ctx.createGain()
+    this.ambientBus.gain.value = 1.0
+    this.ambientBus.connect(this.masterGain) // ambient 干声直通
 
-    this.reverbGain = this.ctx.createGain()
-    this.reverbGain.gain.value = 0.25
-    this.convolver.connect(this.reverbGain)
-    this.reverbGain.connect(this.masterGain)
+    this.ambientReverbSend = ctx.createGain()
+    this.ambientReverbSend.gain.value = 0  // setReverbWet 末尾会设置
+    this.ambientBus.connect(this.ambientReverbSend)
 
-    this.dryBus = this.ctx.createGain()
-    this.eventBus = this.ctx.createGain()
-    this.dryBus.connect(this.masterGain)
-    this.eventBus.connect(this.masterGain)
+    this.ambientConvolver = ctx.createConvolver()
+    this.ambientConvolver.normalize = true
+    this.ambientReverbSend.connect(this.ambientConvolver)
 
-    this.drySend = this.ctx.createGain()
-    this.drySend.gain.value = 1.0
-    this.dryBus.connect(this.drySend)
-    this.drySend.connect(this.convolver)
+    this.ambientReverbGain = ctx.createGain()
+    this.ambientReverbGain.gain.value = 0.25
+    this.ambientConvolver.connect(this.ambientReverbGain)
+    this.ambientReverbGain.connect(this.masterGain)
 
-    this.eventSend = this.ctx.createGain()
-    this.eventSend.gain.value = 1.5
-    this.eventBus.connect(this.eventSend)
-    this.eventSend.connect(this.convolver)
+    // ───── 3. Event 路径 ─────
+    this.eventBus = ctx.createGain()
+    this.eventBus.gain.value = 1.0
+    // event 信号先汇入 eventBus，再经过 eventTrim 才分干/湿
+    this.eventTrim = ctx.createGain()
+    this.eventTrim.gain.value = 3.0  // +9.5 dB，基于实验数据
+    this.eventBus.connect(this.eventTrim)
 
+    // eventTrim → masterGain (干声主导，unity)
+    this.eventTrim.connect(this.masterGain)
+
+    // eventTrim → eventReverbSend → eventConvolver → eventReverbGain → masterGain
+    this.eventReverbSend = ctx.createGain()
+    this.eventReverbSend.gain.value = 0  // setReverbWet 末尾会设置
+    this.eventTrim.connect(this.eventReverbSend)
+
+    this.eventConvolver = ctx.createConvolver()
+    this.eventConvolver.normalize = true
+    this.eventReverbSend.connect(this.eventConvolver)
+
+    this.eventReverbGain = ctx.createGain()
+    this.eventReverbGain.gain.value = 0.30
+    this.eventConvolver.connect(this.eventReverbGain)
+    this.eventReverbGain.connect(this.masterGain)
+
+    // ───── 4. IR：本 Task 两条 reverb 都用同一个山谷 IR ─────
+    // 双 IR 拆分留给 Task 1.2
+    const sharedIR = generateMountainValleyIR(ctx, 6)
+    this.ambientConvolver.buffer = sharedIR
+    this.eventConvolver.buffer = sharedIR
+
+    // ───── 5. 初始化 reverbWet（会同时设置 ambient/event 两个 send）─────
     this.setReverbWet(this.preset.reverbWet)
-    this.convolver.buffer = generateMountainValleyIR(this.ctx, 6)
 
-    // Diagnostics：在所有关键 bus 上挂探针，供 DevPanel 实时读取
-    this._diagnostics = new AudioDiagnostics(this.ctx)
+    // ───── 6. Diagnostics 探针更新 ─────
+    this._diagnostics = new AudioDiagnostics(ctx)
     this._diagnostics.attachProbe('master', this.masterGain)
-    this._diagnostics.attachProbe('dryBus', this.dryBus)
+    this._diagnostics.attachProbe('ambientBus', this.ambientBus)
     this._diagnostics.attachProbe('eventBus', this.eventBus)
-    this._diagnostics.attachProbe('reverbGain', this.reverbGain)
+    this._diagnostics.attachProbe('eventTrim', this.eventTrim)
+    this._diagnostics.attachProbe('ambientReverb', this.ambientReverbGain)
+    this._diagnostics.attachProbe('eventReverb', this.eventReverbGain)
     this._diagnostics.attachProbe('limiter', this.limiter)
 
     setTimeout(() => this.warmupNoiseBuffers(), 0)
@@ -320,20 +358,21 @@ export class AudioEngine {
     const base = this.preset.reverbWet
     const offset = (this._spatialLevel - 0.5) * 0.7
     this.setReverbWet(base + offset)
-    if (this.ctx && this.dryBus) {
-      const dryBusGain = 1 - this._spatialLevel * 0.25
-      this.dryBus.gain.setTargetAtTime(dryBusGain, this.ctx.currentTime, 0.1)
-    }
+    // 注意：不再修改 ambientBus.gain，spatial 不削减干声总线
   }
 
   setReverbWet(value: number): void {
     this._reverbWet = clamp(value)
-    if (!this.ctx || !this.drySend || !this.eventSend) return
+    if (!this.ctx || !this.ambientReverbSend || !this.eventReverbSend) return
 
-    const drySendValue = 0.5 + this._reverbWet * 1.5
-    const eventSendValue = 0.8 + this._reverbWet * 2.5
-    this.drySend.gain.setTargetAtTime(drySendValue, this.ctx.currentTime, 0.1)
-    this.eventSend.gain.setTargetAtTime(eventSendValue, this.ctx.currentTime, 0.1)
+    // ambient：可以更湿，背景纹理需要空间感
+    const ambientWet = clamp(this._reverbWet * 1.2)
+    this.ambientReverbSend.gain.setTargetAtTime(ambientWet, this.ctx.currentTime, 0.1)
+
+    // event：干声主导，混响只做"距离感染色"
+    // 远低于旧代码的 0.8 + reverbWet * 2.5，让 attack 不被混响抹平
+    const eventWet = clamp(this._reverbWet * 0.5)
+    this.eventReverbSend.gain.setTargetAtTime(eventWet, this.ctx.currentTime, 0.1)
   }
 
   /** 更新调度器参数（钟声/古琴概率） */
@@ -431,25 +470,35 @@ export class AudioEngine {
 
   dispose(): void {
     this.stopImmediate()
-    this._diagnostics?.dispose()
-    this._diagnostics = null
     this._noiseBuffers = {}
     this._noiseWarmupStarted = false
     this.scheduler?.stop()
     this.scheduler = null
     this.oneShotPlayer = null
-    try { this.dryBus?.disconnect() } catch { /* ignore */ }
-    this.dryBus = null
+    this._diagnostics?.dispose()
+    this._diagnostics = null
+
+    // 按从源到 destination 的顺序断开
+    try { this.ambientBus?.disconnect() } catch { /* ignore */ }
+    this.ambientBus = null
+    try { this.ambientReverbSend?.disconnect() } catch { /* ignore */ }
+    this.ambientReverbSend = null
+    try { this.ambientConvolver?.disconnect() } catch { /* ignore */ }
+    this.ambientConvolver = null
+    try { this.ambientReverbGain?.disconnect() } catch { /* ignore */ }
+    this.ambientReverbGain = null
+
     try { this.eventBus?.disconnect() } catch { /* ignore */ }
     this.eventBus = null
-    try { this.drySend?.disconnect() } catch { /* ignore */ }
-    this.drySend = null
-    try { this.eventSend?.disconnect() } catch { /* ignore */ }
-    this.eventSend = null
-    try { this.convolver?.disconnect() } catch { /* ignore */ }
-    this.convolver = null
-    try { this.reverbGain?.disconnect() } catch { /* ignore */ }
-    this.reverbGain = null
+    try { this.eventTrim?.disconnect() } catch { /* ignore */ }
+    this.eventTrim = null
+    try { this.eventReverbSend?.disconnect() } catch { /* ignore */ }
+    this.eventReverbSend = null
+    try { this.eventConvolver?.disconnect() } catch { /* ignore */ }
+    this.eventConvolver = null
+    try { this.eventReverbGain?.disconnect() } catch { /* ignore */ }
+    this.eventReverbGain = null
+
     try { this.limiter?.disconnect() } catch { /* ignore */ }
     this.limiter = null
     try { this.masterGain?.disconnect() } catch { /* ignore */ }
@@ -486,7 +535,7 @@ export class AudioEngine {
     source.connect(filter)
     filter.connect(panner)
     panner.connect(gain)
-    gain.connect(this.dryBus!)
+    gain.connect(this.ambientBus!)
     source.start(now)
 
     this.layers.set(name, { source, filter, panner, gain, baseGain: layerGain, baseFilterFreq })
@@ -515,7 +564,7 @@ export class AudioEngine {
     osc.connect(filter)
     filter.connect(panner)
     panner.connect(gain)
-    gain.connect(this.dryBus!)
+    gain.connect(this.ambientBus!)
     osc.start(now)
 
     this.layers.set(name, { source: osc, filter, panner, gain, baseGain: layerGain, baseFilterFreq: this.preset.droneFilter })
