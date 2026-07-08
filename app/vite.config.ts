@@ -7,7 +7,7 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt', // 不自动接管，避免会话中页面被重置
       includeAssets: ['favicon.svg', 'icons/*.png'],
       manifest: {
         name: '竹间息 BreezeScape',
@@ -40,6 +40,9 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,jpg,jpeg,woff,woff2}'],
+        // 不自动 skipWaiting，避免播放中页面被新 SW 接管
+        skipWaiting: false,
+        clientsClaim: false,
       },
     }),
   ],

@@ -298,6 +298,13 @@ export class AudioEngine {
     this._diagnostics.attachProbe('limiter', this.limiter)
 
     setTimeout(() => this.warmupNoiseBuffers(), 0)
+
+    // 浏览器挂起 AudioContext 后（切后台/锁屏），回到前台时自动恢复
+    this.ctx.addEventListener('statechange', () => {
+      if (this.ctx && this.ctx.state === 'suspended' && this._playing) {
+        this.ctx.resume().catch(() => { /* ignore */ })
+      }
+    })
   }
 
   private async ensureRunning(): Promise<void> {
@@ -306,6 +313,13 @@ export class AudioEngine {
       throw new Error('当前浏览器不支持 Web Audio API，请尝试使用 Chrome 或 Safari')
     }
     if (this.ctx.state === 'suspended') await this.ctx.resume()
+  }
+
+  /** 恢复被浏览器挂起的 AudioContext（不重建音频层） */
+  resumeContext(): void {
+    if (this.ctx && this.ctx.state === 'suspended') {
+      this.ctx.resume().catch(() => { /* ignore */ })
+    }
   }
 
   // — 参数接口 —

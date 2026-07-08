@@ -75,6 +75,17 @@ export function SessionView({
     return () => { audioEngine.stopImmediate() }
   }, [])
 
+  // 页面回到前台时恢复 AudioContext（浏览器会在后台挂起它）
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && isPlaying) {
+        audioEngine.resumeContext()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [isPlaying])
+
   // ref 持有最新的 remaining / totalSeconds，供规则引擎 tick 读取
   const remainingRef = useRef(remaining)
   useEffect(() => { remainingRef.current = remaining }, [remaining])

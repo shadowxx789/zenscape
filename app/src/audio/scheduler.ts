@@ -168,7 +168,10 @@ export class Scheduler {
   }
 
   private scheduleNext(delaySeconds = rand(TICK_MIN, TICK_MAX)): void {
-    this.stop()
+    // 只清 timer，不调 stop()——stop() 会移除 visibilitychange 监听器
+    if (this.timer) {
+      clearTimeout(this.timer)
+    }
     this.timer = setTimeout(() => this.tick(), delaySeconds * 1000)
   }
 }
