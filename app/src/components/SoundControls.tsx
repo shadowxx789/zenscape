@@ -45,6 +45,9 @@ export function SoundControls({ params, onChange }: SoundControlsProps) {
               value={params[s.key]}
               onChange={(e) => handleChange(s.key, Number(e.target.value))}
               className="zen-slider"
+              style={{
+                background: `linear-gradient(to right, var(--accent) 0%, var(--accent) ${params[s.key] * 100}%, rgba(233, 211, 164, 0.15) ${params[s.key] * 100}%)`,
+              }}
               aria-label={s.label}
             />
             <span className="slider-value">

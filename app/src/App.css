@@ -91,10 +91,20 @@ button {
   letter-spacing: 0;
 }
 
+.hero-panel h1 .brand-sub {
+  display: block;
+  margin-top: 4px;
+  font-size: clamp(1.1rem, 4.5vw, 2.4rem);
+  font-weight: 400;
+  color: var(--accent);
+  letter-spacing: 0.08em;
+}
+
 .hero-copy,
 .session-copy {
   margin: 16px 0 0;
   color: var(--text);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.55);
 }
 
 .selector-block h2 {
@@ -113,7 +123,7 @@ button {
 }
 
 .duration-grid {
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
 }
 
 .option-card,
@@ -184,8 +194,20 @@ button {
 
 .is-selected {
   border-color: var(--accent);
-  background: var(--accent-bg);
+  background: linear-gradient(135deg, rgba(233,211,164,0.10), rgba(233,211,164,0.04));
   box-shadow: inset 0 0 0 1px rgba(237, 211, 164, 0.16);
+  position: relative;
+}
+
+.is-selected::before {
+  content: "";
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
 }
 
 .start-button,
@@ -245,12 +267,25 @@ button {
 }
 
 .session-orb {
-  width: 184px;
-  height: 184px;
+  width: min(320px, 50vw);
+  aspect-ratio: 1;
   display: grid;
   place-items: center;
   border: none;
   border-radius: 999px;
+  position: relative;
+}
+
+.orb-inner {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.orb-inner .countdown {
+  font-size: clamp(1.8rem, 5vw, 2.8rem);
+  margin: 0;
 }
 
 .orb-ring {
@@ -258,10 +293,18 @@ button {
   height: 100%;
 }
 
+.zen-quote {
+  margin: 0;
+  color: rgba(255,255,255,0.35);
+  font-size: 0.85rem;
+  font-weight: 400;
+  letter-spacing: 0.15em;
+}
+
 .countdown {
   margin: 10px 0;
   color: var(--text-h);
-  font-size: clamp(4rem, 20vw, 7rem);
+  font-size: clamp(1.8rem, 5vw, 2.8rem);
   font-variant-numeric: tabular-nums;
   font-weight: 800;
   letter-spacing: -0.08em;
@@ -274,7 +317,8 @@ button {
 }
 
 .ghost-action {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(6, 12, 11, 0.5);
+  backdrop-filter: blur(8px);
 }
 
 @media (min-width: 620px) {
@@ -330,9 +374,8 @@ button {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
-  height: 4px;
-  border-radius: 2px;
-  background: rgba(233, 211, 164, 0.18);
+  height: 6px;
+  border-radius: 3px;
   outline: none;
   cursor: pointer;
 }

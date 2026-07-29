@@ -52,8 +52,8 @@ function App() {
           <section className="hero-panel" aria-labelledby="app-title">
             <img className="hero-image" src={heroImage} alt="" aria-hidden="true" />
             <div className="hero-content">
-              <p className="section-kicker">BreezeScape</p>
-              <h1 id="app-title">竹间息 BreezeScape</h1>
+              <p className="section-kicker">东方禅意 · 生成式冥想</p>
+              <h1 id="app-title">竹间息 <span className="brand-sub">BreezeScape</span></h1>
               <p className="hero-copy">
                 选择一个场景，让风、水、钟与古琴慢慢生成一段不急着结束的安静。
               </p>

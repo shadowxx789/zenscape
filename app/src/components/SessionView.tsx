@@ -180,26 +180,36 @@ export function SessionView({
       aria-label="声景会话"
       style={{ '--session-bg': `url(${sessionImage})` } as React.CSSProperties}
     >
-      <ParticleCanvas isPlaying={isPlaying} brightness={sessionParams.brightness} />
+      <ParticleCanvas
+        isPlaying={isPlaying}
+        brightness={sessionParams.brightness}
+        recentPans={audioEngine.getRecentEvents().map(e => e.pan)}
+      />
       <div className="session-orb" aria-hidden="true">
         <svg viewBox="0 0 184 184" className="orb-ring">
-          <circle cx="92" cy="92" r="90" fill="none" stroke="rgba(233,211,164,0.12)" strokeWidth="1" />
+          <circle cx="92" cy="92" r="90" fill="none" stroke="rgba(233,211,164,0.12)" strokeWidth="2" />
           <circle
             cx="92" cy="92" r="90"
             fill="none"
             stroke="rgba(233,211,164,0.5)"
-            strokeWidth="1.5"
+            strokeWidth="2.5"
             strokeDasharray={`${progress * 565.5} 565.5`}
             strokeLinecap="round"
             transform="rotate(-90 92 92)"
             style={{ transition: 'stroke-dasharray 1s linear' }}
           />
-          <circle cx="92" cy="92" r="40" fill="rgba(233,211,164,0.1)" />
+          <circle cx="92" cy="92" r="60" fill="rgba(233,211,164,0.1)" />
         </svg>
+        <div className="orb-inner">
+          <div className="countdown" aria-label={`倒计时 ${formatTime(remaining)}`}>
+            {formatTime(remaining)}
+          </div>
+        </div>
       </div>
 
       <p className="section-kicker">Session · {phaseLabel[currentPhase]}</p>
       <h1>{MODE_DETAILS[mode].label}</h1>
+      <p className="zen-quote">竹影扫阶尘不动，月穿潭底水无痕</p>
 
       {isFinished ? (
         <p className="session-copy">一段声景结束了。</p>
@@ -214,11 +224,6 @@ export function SessionView({
           {errorMessage}
         </p>
       )}
-
-      <div className="countdown" aria-label={`倒计时 ${formatTime(remaining)}`}>
-        {formatTime(remaining)}
-      </div>
-
       {/* 会话中的迷你滑杆 */}
       {isPlaying && !isFinished && (
         <div className="session-sliders">
