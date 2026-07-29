@@ -29,7 +29,7 @@ export const MODE_PRESETS: Record<Mode, ModePreset> = {
     sound: {
       masterVolume: 0.48,
       natureLevel: 0.62,
-      instrumentLevel: 0.34,
+      instrumentLevel: 0.42,
       spatialLevel: 0.44,
       brightness: 0.44,
     },
@@ -43,9 +43,9 @@ export const MODE_PRESETS: Record<Mode, ModePreset> = {
       firstEventDelay: 18,
     },
     engine: {
-      windGain: 0.36,
+      windGain: 0.26,
       waterGain: 0.18,
-      droneGain: 0.075,
+      droneGain: 0.01,
       droneFrequency: 55,
       droneFilter: 135,
       windFilter: 560,
@@ -60,7 +60,7 @@ export const MODE_PRESETS: Record<Mode, ModePreset> = {
     sound: {
       masterVolume: 0.36,
       natureLevel: 0.56,
-      instrumentLevel: 0.14,
+      instrumentLevel: 0.22,
       spatialLevel: 0.54,
       brightness: 0.22,
     },
@@ -74,9 +74,9 @@ export const MODE_PRESETS: Record<Mode, ModePreset> = {
       firstEventDelay: 45,
     },
     engine: {
-      windGain: 0.28,
+      windGain: 0.20,
       waterGain: 0.24,
-      droneGain: 0.045,
+      droneGain: 0.01,
       droneFrequency: 49,
       droneFilter: 105,
       windFilter: 420,
@@ -91,7 +91,7 @@ export const MODE_PRESETS: Record<Mode, ModePreset> = {
     sound: {
       masterVolume: 0.46,
       natureLevel: 0.54,
-      instrumentLevel: 0.22,
+      instrumentLevel: 0.30,
       spatialLevel: 0.28,
       brightness: 0.58,
     },
@@ -105,9 +105,9 @@ export const MODE_PRESETS: Record<Mode, ModePreset> = {
       firstEventDelay: 28,
     },
     engine: {
-      windGain: 0.2,
+      windGain: 0.15,
       waterGain: 0.3,
-      droneGain: 0.035,
+      droneGain: 0.01,
       droneFrequency: 73,
       droneFilter: 160,
       windFilter: 720,

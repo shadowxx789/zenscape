@@ -62,7 +62,7 @@ const LAYER_CONFIGS: Record<string, LayerConfig> = {
     filterFreq: 135,
     filterQ: 0.45,
     filterType: 'lowpass',
-    defaultGain: 0.25,
+    defaultGain: 0.01,
     oscFreq: 55,
     oscType: 'sine',
   },

@@ -20,16 +20,16 @@ const DEFAULT_OPTIONS: Required<OneShotOptions> = {
 }
 
 const BELL_PARTIALS = [
-  { ratio: 0.500, decay: 16.0, amp: 0.55, attack: 0.40 },
-  { ratio: 1.000, decay: 14.0, amp: 1.00, attack: 0.30 },
-  { ratio: 2.000, decay: 7.5, amp: 0.42, attack: 0.25 },
-  { ratio: 2.760, decay: 4.2, amp: 0.22, attack: 0.20 },
-  { ratio: 5.404, decay: 2.5, amp: 0.10, attack: 0.15 },
-  { ratio: 8.933, decay: 1.4, amp: 0.05, attack: 0.10 },
-  { ratio: 13.345, decay: 0.8, amp: 0.025, attack: 0.08 },
+  { ratio: 0.500, decay: 16.0, amp: 0.55, attack: 0.05 },
+  { ratio: 1.000, decay: 14.0, amp: 1.00, attack: 0.04 },
+  { ratio: 2.000, decay: 7.5, amp: 0.42, attack: 0.03 },
+  { ratio: 2.760, decay: 4.2, amp: 0.22, attack: 0.03 },
+  { ratio: 5.404, decay: 2.5, amp: 0.10, attack: 0.02 },
+  { ratio: 8.933, decay: 1.4, amp: 0.05, attack: 0.02 },
+  { ratio: 13.345, decay: 0.8, amp: 0.025, attack: 0.01 },
 ]
 
-const BELL_FUNDAMENTAL_RANGE: [number, number] = [115, 150]
+const BELL_FUNDAMENTAL_RANGE: [number, number] = [180, 250]
 const PARTIAL_START_JITTER_MS: [number, number] = [0, 15]
 
 const GUQIN_PARAMS = {
@@ -93,7 +93,7 @@ export class OneShotPlayer {
 
     const lpf = ctx.createBiquadFilter()
     lpf.type = 'lowpass'
-    lpf.frequency.value = 2200
+    lpf.frequency.value = 5000
     lpf.Q.value = 0.4
     lpf.connect(panner)
     panner.connect(this.eventBus)
@@ -125,7 +125,7 @@ export class OneShotPlayer {
   private synthGuqin(now: number, volume: number, pan: number): void {
     const freqs = getPentatonicFrequencies(this.scale)
     const baseFreq = freqs[Math.floor(Math.random() * freqs.length)]
-    this.playGuqinNote(baseFreq, volume * 0.72, pan, now)
+    this.playGuqinNote(baseFreq, volume * 1.0, pan, now)
 
     if (Math.random() < HARMONIC_OVERTONE_PROB) {
       const secondFreq = freqs[Math.floor(Math.random() * freqs.length)]
