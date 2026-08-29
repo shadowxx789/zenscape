@@ -35,11 +35,8 @@ export function SessionView({
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [sessionParams, setSessionParams] = useState<SoundParams>(initialSoundParams)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  // 用户手动调过的参数，规则引擎不再覆盖
   const userTouched = useRef<Set<keyof SoundParams>>(new Set())
-  // 用 ref 存最新 sessionParams，避免 useEffect 闭包问题
   const sessionParamsRef = useRef(sessionParams)
-  // 在 effect 里更新 ref，避免 render 期间写 ref
   useEffect(() => {
     sessionParamsRef.current = sessionParams
   }, [sessionParams])
@@ -51,7 +48,6 @@ export function SessionView({
     }
   }, [])
 
-  // 倒计时
   useEffect(() => {
     if (isPlaying && remaining > 0) {
       intervalRef.current = setInterval(() => {
@@ -70,12 +66,10 @@ export function SessionView({
     return clearTimer
   }, [isPlaying, clearTimer])
 
-  // 卸载清理
   useEffect(() => {
     return () => { audioEngine.stopImmediate() }
   }, [])
 
-  // 页面回到前台时恢复 AudioContext（浏览器会在后台挂起它）
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState === 'visible' && isPlaying) {
@@ -86,13 +80,11 @@ export function SessionView({
     return () => document.removeEventListener('visibilitychange', handleVisibility)
   }, [isPlaying])
 
-  // ref 持有最新的 remaining / totalSeconds，供规则引擎 tick 读取
   const remainingRef = useRef(remaining)
   useEffect(() => { remainingRef.current = remaining }, [remaining])
   const totalSecondsRef = useRef(totalSeconds)
   useEffect(() => { totalSecondsRef.current = totalSeconds }, [totalSeconds])
 
-  // M4：规则引擎——每 4 秒根据进度重新计算参数
   useEffect(() => {
     if (!isPlaying || isFinished) return
 
@@ -100,7 +92,6 @@ export function SessionView({
       const progress = 1 - remainingRef.current / totalSecondsRef.current
       const hour = new Date().getHours()
       const output = computeParams(mode, progress, {}, hour)
-      // 只更新用户没手动调过的参数
       const merged: SoundParams = { ...sessionParamsRef.current }
       for (const key of Object.keys(output.soundParams) as (keyof SoundParams)[]) {
         if (!userTouched.current.has(key)) {
@@ -116,7 +107,6 @@ export function SessionView({
     return () => clearInterval(timer)
   }, [isPlaying, isFinished, mode])
 
-  // 参数实时同步到 engine
   useEffect(() => {
     audioEngine.setMode(mode)
     audioEngine.setMasterVolume(sessionParams.masterVolume)
@@ -124,6 +114,7 @@ export function SessionView({
     audioEngine.setInstrumentLevel(sessionParams.instrumentLevel)
     audioEngine.setSpatialLevel(sessionParams.spatialLevel)
     audioEngine.setBrightness(sessionParams.brightness)
+    audioEngine.setWaterClarity(sessionParams.waterClarity)
   }, [mode, sessionParams])
 
   const handlePlayPause = async () => {
@@ -224,7 +215,6 @@ export function SessionView({
           {errorMessage}
         </p>
       )}
-      {/* 会话中的迷你滑杆 */}
       {isPlaying && !isFinished && (
         <div className="session-sliders">
           {([
