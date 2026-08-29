@@ -12,6 +12,7 @@ export type EnginePreset = {
   droneFilter: number
   windFilter: number
   waterFilter: number
+  waterClarity: number
   windPan: number
   waterPan: number
   reverbWet: number
@@ -32,6 +33,7 @@ export const MODE_PRESETS: Record<Mode, ModePreset> = {
       instrumentLevel: 0.42,
       spatialLevel: 0.44,
       brightness: 0.44,
+      waterClarity: 0.35,
     },
     scheduler: {
       density: 0.32,
@@ -49,7 +51,8 @@ export const MODE_PRESETS: Record<Mode, ModePreset> = {
       droneFrequency: 55,
       droneFilter: 135,
       windFilter: 560,
-      waterFilter: 1900,
+      waterFilter: 700,
+      waterClarity: 0.35,
       windPan: -0.26,
       waterPan: 0.2,
       reverbWet: 0.45,
@@ -63,6 +66,7 @@ export const MODE_PRESETS: Record<Mode, ModePreset> = {
       instrumentLevel: 0.22,
       spatialLevel: 0.54,
       brightness: 0.22,
+      waterClarity: 0.15,
     },
     scheduler: {
       density: 0.18,
@@ -80,7 +84,8 @@ export const MODE_PRESETS: Record<Mode, ModePreset> = {
       droneFrequency: 49,
       droneFilter: 105,
       windFilter: 420,
-      waterFilter: 1450,
+      waterFilter: 550,
+      waterClarity: 0.15,
       windPan: -0.18,
       waterPan: 0.3,
       reverbWet: 0.65,
@@ -94,6 +99,7 @@ export const MODE_PRESETS: Record<Mode, ModePreset> = {
       instrumentLevel: 0.30,
       spatialLevel: 0.28,
       brightness: 0.58,
+      waterClarity: 0.60,
     },
     scheduler: {
       density: 0.26,
@@ -111,7 +117,8 @@ export const MODE_PRESETS: Record<Mode, ModePreset> = {
       droneFrequency: 73,
       droneFilter: 160,
       windFilter: 720,
-      waterFilter: 2400,
+      waterFilter: 900,
+      waterClarity: 0.60,
       windPan: -0.12,
       waterPan: 0.16,
       reverbWet: 0.25,
