@@ -114,7 +114,10 @@ export function SessionView({
     audioEngine.setInstrumentLevel(sessionParams.instrumentLevel)
     audioEngine.setSpatialLevel(sessionParams.spatialLevel)
     audioEngine.setBrightness(sessionParams.brightness)
-    audioEngine.setWaterClarity(sessionParams.waterClarity)
+    const engine = audioEngine as typeof audioEngine & {
+      setWaterClarity?: (value: number) => void
+    }
+    engine.setWaterClarity?.(sessionParams.waterClarity)
   }, [mode, sessionParams])
 
   const handlePlayPause = async () => {
