@@ -1,0 +1,1 @@
+if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('/zenscape/sprint-1.5/sw.js', { scope: '/zenscape/sprint-1.5/' })})}
