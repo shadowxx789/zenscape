@@ -14,6 +14,8 @@ const SLIDERS: SliderDef[] = [
   { key: 'instrumentLevel', label: '乐器', min: 0, max: 1, step: 0.01 },
   { key: 'spatialLevel', label: '空间感', min: 0, max: 1, step: 0.01 },
   { key: 'brightness', label: '明亮度', min: 0, max: 1, step: 0.01 },
+  // 第一听期间不暴露，验收通过后再决定是否开放：
+  // { key: 'waterClarity', label: '水轮廓', min: 0, max: 0.6, step: 0.01 },
 ]
 
 type SoundControlsProps = {

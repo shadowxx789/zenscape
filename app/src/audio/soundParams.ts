@@ -4,6 +4,7 @@ export type SoundParams = {
   instrumentLevel: number
   spatialLevel: number
   brightness: number
+  waterClarity: number
 }
 
 export const DEFAULT_PARAMS: SoundParams = {
@@ -12,4 +13,5 @@ export const DEFAULT_PARAMS: SoundParams = {
   instrumentLevel: 0.34,
   spatialLevel: 0.44,
   brightness: 0.44,
+  waterClarity: 0.35,
 }

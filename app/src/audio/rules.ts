@@ -115,6 +115,7 @@ export function computeParams(
     instrumentLevel: mergeParam(preset.sound.instrumentLevel, phaseMod.instrumentLevel, timeMod.instrumentLevel, userOverrides.instrumentLevel),
     spatialLevel:    mergeParam(preset.sound.spatialLevel,    phaseMod.spatialLevel,    timeMod.spatialLevel,    userOverrides.spatialLevel),
     brightness:      mergeParam(preset.sound.brightness,      phaseMod.brightness,      timeMod.brightness,      userOverrides.brightness),
+    waterClarity:    mergeParam(preset.sound.waterClarity,    phaseMod.waterClarity,    timeMod.waterClarity,    userOverrides.waterClarity),
   }
 
   // 调度器参数也随阶段变化

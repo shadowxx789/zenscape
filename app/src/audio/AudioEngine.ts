@@ -30,6 +30,7 @@ const FADE_IN_TIME = 0.5 // 总线淡入 500ms
 const USE_PINK_NOISE = true
 const PINK_NOISE_GAIN_COMPENSATION = 0.85
 const LOOP_CROSSFADE_SECONDS = 0.75
+const WATER_CLARITY_CAP = 0.6
 
 // — 层配置 —
 interface LayerConfig {
@@ -75,21 +76,27 @@ interface ActiveLayer {
   gain: GainNode
   baseGain: number
   baseFilterFreq: number
+  bodyFilter?: BiquadFilterNode
+  surgeGain?: GainNode
+  surgeDepth?: GainNode
+  surgeLFO?: OscillatorNode
+  detailGain?: GainNode
+  detailFilter?: BiquadFilterNode
 }
 
 export type LayerName = 'wind' | 'water' | 'drone'
 
 export interface RecentEvent {
-  time: number      // performance.now() 时间戳
+  time: number
   type: 'temple_bell' | 'guqin_harmonic'
-  volume: number    // 当时的 instrumentLevel
-  pan: number       // [-1, 1]
+  volume: number
+  pan: number
 }
 
 export class AudioEngine {
   private ctx: AudioContext | null = null
   private masterGain: GainNode | null = null
-  private fadeGain: GainNode | null = null // 总线淡入淡出节点
+  private fadeGain: GainNode | null = null
   private ambientBus: GainNode | null = null
   private eventBus: GainNode | null = null
   private ambientReverbSend: GainNode | null = null
@@ -105,16 +112,16 @@ export class AudioEngine {
   private _fading = false
   private _fadeToken = 0
 
-  private _noiseBuffers: Partial<Record<'wind' | 'water', AudioBuffer>> = {}
+  private _noiseBuffers: Record<string, AudioBuffer> = {}
   private _noiseWarmupStarted = false
   private evolutionTimer: ReturnType<typeof setTimeout> | null = null
+  private _waterRebuildToken = 0
+  private _waterClarity = 0.35
 
-  // 一次性事件（M3）
   private oneShotPlayer: OneShotPlayer | null = null
   private scheduler: Scheduler | null = null
   private preset: EnginePreset = getModePreset('meditate').engine
 
-  // 参数
   private _masterVolume = 0.6
   private _brightness = 0.5
   private _natureLevel = 0.7
@@ -134,7 +141,6 @@ export class AudioEngine {
     return this._diagnostics
   }
 
-  /** 立即触发一个 one-shot 事件（绕过调度器，仅 dev 用） */
   triggerEvent(type: 'temple_bell' | 'guqin_harmonic'): void {
     if (!this.oneShotPlayer || !this._playing) {
       console.warn('[AudioEngine] triggerEvent ignored: not playing')
@@ -143,7 +149,6 @@ export class AudioEngine {
     this.oneShotPlayer.play(type)
   }
 
-  /** 静音 ambient 层（wind/water/drone），不影响 event */
   muteAmbient(muted: boolean): void {
     if (!this.ctx) return
     if (muted === this._ambientMuted) return
@@ -161,18 +166,15 @@ export class AudioEngine {
     }
   }
 
-  /** Solo event 层：静音 ambient，等价于 muteAmbient(true) */
   soloEvents(solo: boolean): void {
     this._eventsSolo = solo
     this.muteAmbient(solo)
   }
 
-  /** 读取最近的事件（最多 20 个，最新在前） */
   getRecentEvents(): RecentEvent[] {
     return [...this._recentEvents]
   }
 
-  /** 当前 mute/solo 状态 */
   get ambientMuted(): boolean { return this._ambientMuted }
   get eventsSolo(): boolean { return this._eventsSolo }
 
@@ -188,16 +190,38 @@ export class AudioEngine {
     }
   }
 
+  private clampClarity(value: number): number {
+    return Math.max(0, Math.min(WATER_CLARITY_CAP, value))
+  }
+
   setMode(mode: Mode): void {
     if (this._currentMode === mode) return
+    const previousMode = this._currentMode
     this._currentMode = mode
     this.preset = getModePreset(mode).engine
+    this._waterClarity = this.clampClarity(this.preset.waterClarity)
     this.setReverbWet(this.preset.reverbWet)
     this.oneShotPlayer?.setScale(this.preset.scale)
 
     if (!this.ctx) return
+
     this.applyLayerGain('wind', this.getLayerGain('wind'))
-    this.applyLayerGain('water', this.getLayerGain('water'))
+    const wind = this.layers.get('wind')
+    if (wind) {
+      wind.filter.frequency.setTargetAtTime(
+        mapBrightness(this._brightness, this.preset.windFilter),
+        this.ctx.currentTime,
+        0.1,
+      )
+    }
+
+    if (previousMode && this.layers.has('water')) {
+      this.rebuildWaterLayer()
+    } else {
+      this.applyLayerGain('water', this.getLayerGain('water'))
+      this.applyWaterClarity()
+    }
+
     this.applyLayerGain('drone', this.getDroneGain())
     this.setBrightness(this._brightness)
     this.setSpatialLevel(this._spatialLevel)
@@ -217,12 +241,10 @@ export class AudioEngine {
     this.ctx = new AudioCtx()
     const ctx = this.ctx
 
-    // ───── 1. 输出链（destination 向上构建）─────
     this.fadeGain = ctx.createGain()
     this.fadeGain.gain.value = 0
     this.fadeGain.connect(ctx.destination)
 
-    // Brickwall limiter — 仅做防爆，不做音量塑形
     this.limiter = ctx.createDynamicsCompressor()
     this.limiter.threshold.value = -1.0
     this.limiter.knee.value = 0
@@ -235,13 +257,12 @@ export class AudioEngine {
     this.masterGain.gain.value = this._masterVolume
     this.masterGain.connect(this.limiter)
 
-    // ───── 2. Ambient 路径 ─────
     this.ambientBus = ctx.createGain()
     this.ambientBus.gain.value = 1.0
-    this.ambientBus.connect(this.masterGain) // ambient 干声直通
+    this.ambientBus.connect(this.masterGain)
 
     this.ambientReverbSend = ctx.createGain()
-    this.ambientReverbSend.gain.value = 0  // setReverbWet 末尾会设置
+    this.ambientReverbSend.gain.value = 0
     this.ambientBus.connect(this.ambientReverbSend)
 
     this.ambientConvolver = ctx.createConvolver()
@@ -253,20 +274,15 @@ export class AudioEngine {
     this.ambientConvolver.connect(this.ambientReverbGain)
     this.ambientReverbGain.connect(this.masterGain)
 
-    // ───── 3. Event 路径 ─────
     this.eventBus = ctx.createGain()
     this.eventBus.gain.value = 1.0
-    // event 信号先汇入 eventBus，再经过 eventTrim 才分干/湿
     this.eventTrim = ctx.createGain()
-    this.eventTrim.gain.value = 3.0  // +9.5 dB，基于实验数据
+    this.eventTrim.gain.value = 3.0
     this.eventBus.connect(this.eventTrim)
-
-    // eventTrim → masterGain (干声主导，unity)
     this.eventTrim.connect(this.masterGain)
 
-    // eventTrim → eventReverbSend → eventConvolver → eventReverbGain → masterGain
     this.eventReverbSend = ctx.createGain()
-    this.eventReverbSend.gain.value = 0  // setReverbWet 末尾会设置
+    this.eventReverbSend.gain.value = 0
     this.eventTrim.connect(this.eventReverbSend)
 
     this.eventConvolver = ctx.createConvolver()
@@ -278,16 +294,12 @@ export class AudioEngine {
     this.eventConvolver.connect(this.eventReverbGain)
     this.eventReverbGain.connect(this.masterGain)
 
-    // ───── 4. IR：本 Task 两条 reverb 都用同一个山谷 IR ─────
-    // 双 IR 拆分留给 Task 1.2
     const sharedIR = generateMountainValleyIR(ctx, 6)
     this.ambientConvolver.buffer = sharedIR
     this.eventConvolver.buffer = sharedIR
 
-    // ───── 5. 初始化 reverbWet（会同时设置 ambient/event 两个 send）─────
     this.setReverbWet(this.preset.reverbWet)
 
-    // ───── 6. Diagnostics 探针更新 ─────
     this._diagnostics = new AudioDiagnostics(ctx)
     this._diagnostics.attachProbe('master', this.masterGain)
     this._diagnostics.attachProbe('ambientBus', this.ambientBus)
@@ -299,7 +311,6 @@ export class AudioEngine {
 
     setTimeout(() => this.warmupNoiseBuffers(), 0)
 
-    // 浏览器挂起 AudioContext 后（切后台/锁屏），回到前台时自动恢复
     this.ctx.addEventListener('statechange', () => {
       if (this.ctx && this.ctx.state === 'suspended' && this._playing) {
         this.ctx.resume().catch(() => { /* ignore */ })
@@ -315,14 +326,11 @@ export class AudioEngine {
     if (this.ctx.state === 'suspended') await this.ctx.resume()
   }
 
-  /** 恢复被浏览器挂起的 AudioContext（不重建音频层） */
   resumeContext(): void {
     if (this.ctx && this.ctx.state === 'suspended') {
       this.ctx.resume().catch(() => { /* ignore */ })
     }
   }
-
-  // — 参数接口 —
 
   setMasterVolume(value: number): void {
     const clamped = clamp(value)
@@ -355,10 +363,64 @@ export class AudioEngine {
     this._brightness = clamped
     if (!this.ctx) return
     const now = this.ctx.currentTime
-    for (const layer of this.layers.values()) {
+
+    for (const [name, layer] of this.layers) {
       const freq = mapBrightness(this._brightness, layer.baseFilterFreq)
-      layer.filter.frequency.setTargetAtTime(freq, now, 0.1)
+      if (name === 'water') {
+        layer.filter.frequency.setTargetAtTime(freq * (1 + this._waterClarity * 0.3), now, 0.1)
+      } else {
+        layer.filter.frequency.setTargetAtTime(freq, now, 0.1)
+      }
     }
+  }
+
+  setWaterClarity(value: number): void {
+    const clamped = this.clampClarity(value)
+    this._waterClarity = clamped
+    this.applyWaterClarity()
+  }
+
+  private applyWaterClarity(): void {
+    if (!this.ctx) return
+    const water = this.layers.get('water')
+    if (!water) return
+    const now = this.ctx.currentTime
+
+    if (water.detailGain) {
+      water.detailGain.gain.setTargetAtTime(this._waterClarity * 0.25, now, 0.1)
+    }
+    if (water.filter) {
+      const baseFreq = mapBrightness(this._brightness, this.preset.waterFilter)
+      water.filter.frequency.setTargetAtTime(baseFreq * (1 + this._waterClarity * 0.3), now, 0.1)
+    }
+  }
+
+  devReduceWindToAir(): void {
+    if (!this.ctx) return
+    const wind = this.layers.get('wind')
+    if (wind) wind.gain.gain.setTargetAtTime(0.02, this.ctx.currentTime, 0.5)
+  }
+
+  devRestoreWind(): void {
+    if (!this.ctx) return
+    const wind = this.layers.get('wind')
+    if (wind) wind.gain.gain.setTargetAtTime(this.getLayerGain('wind'), this.ctx.currentTime, 0.5)
+  }
+
+  devSoloWater(): void {
+    if (!this.ctx) return
+    const wind = this.layers.get('wind')
+    const drone = this.layers.get('drone')
+    if (wind) wind.gain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.3)
+    if (drone) drone.gain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.3)
+  }
+
+  devUnsolo(): void {
+    if (!this.ctx) return
+    const wind = this.layers.get('wind')
+    const drone = this.layers.get('drone')
+    if (wind) wind.gain.gain.setTargetAtTime(this.getLayerGain('wind'), this.ctx.currentTime, 0.3)
+    if (drone) drone.gain.gain.setTargetAtTime(this.getDroneGain(), this.ctx.currentTime, 0.3)
   }
 
   setSpatialLevel(value: number): void {
@@ -372,29 +434,20 @@ export class AudioEngine {
     const base = this.preset.reverbWet
     const offset = (this._spatialLevel - 0.5) * 0.7
     this.setReverbWet(base + offset)
-    // 注意：不再修改 ambientBus.gain，spatial 不削减干声总线
   }
 
   setReverbWet(value: number): void {
     this._reverbWet = clamp(value)
     if (!this.ctx || !this.ambientReverbSend || !this.eventReverbSend) return
-
-    // ambient：可以更湿，背景纹理需要空间感
     const ambientWet = clamp(this._reverbWet * 1.2)
     this.ambientReverbSend.gain.setTargetAtTime(ambientWet, this.ctx.currentTime, 0.1)
-
-    // event：干声主导，混响只做"距离感染色"
-    // 远低于旧代码的 0.8 + reverbWet * 2.5，让 attack 不被混响抹平
     const eventWet = clamp(this._reverbWet * 0.5)
     this.eventReverbSend.gain.setTargetAtTime(eventWet, this.ctx.currentTime, 0.1)
   }
 
-  /** 更新调度器参数（钟声/古琴概率） */
   setSchedulerParams(params: Partial<SchedulerParams>): void {
     this.scheduler?.setParams(params)
   }
-
-  // — 播放控制 —
 
   async play(): Promise<void> {
     await this.ensureRunning()
@@ -403,7 +456,6 @@ export class AudioEngine {
     const ctx = this.ctx!
     const now = ctx.currentTime
 
-    // 总线淡入：fadeGain 从 0 渐起到 1
     this.fadeGain!.gain.setValueAtTime(0, now)
     this.fadeGain!.gain.linearRampToValueAtTime(1, now + FADE_IN_TIME)
 
@@ -414,10 +466,8 @@ export class AudioEngine {
     this._playing = true
     this.scheduleEvolution()
 
-    // M3：启动调度器
     if (!this.oneShotPlayer) {
       this.oneShotPlayer = new OneShotPlayer(ctx, this.eventBus!)
-      // 包装 play 方法以记录所有事件（含调度器触发的与手动触发的）
       const originalPlay = this.oneShotPlayer.play.bind(this.oneShotPlayer)
       this.oneShotPlayer.play = (type, opts) => {
         this._recordEvent(type)
@@ -442,8 +492,6 @@ export class AudioEngine {
 
     this._fading = true
     const now = this.ctx.currentTime
-
-    // 总线淡出
     this.fadeGain!.gain.cancelScheduledValues(now)
     this.fadeGain!.gain.setValueAtTime(this.fadeGain!.gain.value, now)
     this.fadeGain!.gain.linearRampToValueAtTime(0, now + FADE_DURATION)
@@ -456,6 +504,23 @@ export class AudioEngine {
     }, FADE_DURATION * 1000)
   }
 
+  private disconnectLayer(layer: ActiveLayer): void {
+    try { layer.source.stop() } catch { /* already stopped */ }
+    try { layer.source.disconnect() } catch { /* ignore */ }
+    try { layer.filter.disconnect() } catch { /* ignore */ }
+    try { layer.panner.disconnect() } catch { /* ignore */ }
+    try { layer.gain.disconnect() } catch { /* ignore */ }
+    if (layer.bodyFilter) try { layer.bodyFilter.disconnect() } catch { /* ignore */ }
+    if (layer.surgeLFO) {
+      try { layer.surgeLFO.stop() } catch { /* ignore */ }
+      try { layer.surgeLFO.disconnect() } catch { /* ignore */ }
+    }
+    if (layer.surgeDepth) try { layer.surgeDepth.disconnect() } catch { /* ignore */ }
+    if (layer.surgeGain) try { layer.surgeGain.disconnect() } catch { /* ignore */ }
+    if (layer.detailGain) try { layer.detailGain.disconnect() } catch { /* ignore */ }
+    if (layer.detailFilter) try { layer.detailFilter.disconnect() } catch { /* ignore */ }
+  }
+
   stopImmediate(): void {
     this._fadeToken++
     this._fading = false
@@ -465,19 +530,13 @@ export class AudioEngine {
       this.evolutionTimer = null
     }
 
-    // 立即静音总线
     if (this.fadeGain && this.ctx) {
       this.fadeGain.gain.cancelScheduledValues(this.ctx.currentTime)
       this.fadeGain.gain.setValueAtTime(0, this.ctx.currentTime)
     }
 
-    for (const [, layer] of this.layers) {
-      try { layer.source.stop() } catch { /* already stopped */ }
-      try { layer.source.disconnect() } catch { /* ignore */ }
-      try { layer.filter.disconnect() } catch { /* ignore */ }
-      try { layer.panner.disconnect() } catch { /* ignore */ }
-      try { layer.gain.disconnect() } catch { /* ignore */ }
-    }
+    this._waterRebuildToken++
+    for (const [, layer] of this.layers) this.disconnectLayer(layer)
     this.layers.clear()
     this._playing = false
   }
@@ -492,7 +551,6 @@ export class AudioEngine {
     this._diagnostics?.dispose()
     this._diagnostics = null
 
-    // 按从源到 destination 的顺序断开
     try { this.ambientBus?.disconnect() } catch { /* ignore */ }
     this.ambientBus = null
     try { this.ambientReverbSend?.disconnect() } catch { /* ignore */ }
@@ -501,7 +559,6 @@ export class AudioEngine {
     this.ambientConvolver = null
     try { this.ambientReverbGain?.disconnect() } catch { /* ignore */ }
     this.ambientReverbGain = null
-
     try { this.eventBus?.disconnect() } catch { /* ignore */ }
     this.eventBus = null
     try { this.eventTrim?.disconnect() } catch { /* ignore */ }
@@ -512,7 +569,6 @@ export class AudioEngine {
     this.eventConvolver = null
     try { this.eventReverbGain?.disconnect() } catch { /* ignore */ }
     this.eventReverbGain = null
-
     try { this.limiter?.disconnect() } catch { /* ignore */ }
     this.limiter = null
     try { this.masterGain?.disconnect() } catch { /* ignore */ }
@@ -523,8 +579,6 @@ export class AudioEngine {
     this.ctx = null
   }
 
-  // — 内部：层创建 —
-
   private createNoiseLayer(name: 'wind' | 'water', now: number): void {
     const ctx = this.ctx!
     const config = LAYER_CONFIGS[name]
@@ -534,17 +588,79 @@ export class AudioEngine {
     source.buffer = this.getNoiseBuffer(name)
     source.loop = true
 
+    const gain = ctx.createGain()
+    const layerGain = this.getLayerGain(name)
+    gain.gain.setValueAtTime(layerGain, now)
+
+    const panner = ctx.createStereoPanner()
+    panner.pan.value = getLayerPan(name, this._spatialLevel, this.preset)
+
+    if (name === 'water') {
+      const lowpass = ctx.createBiquadFilter()
+      lowpass.type = 'lowpass'
+      lowpass.frequency.value = baseFilterFreq * 1.8
+      lowpass.Q.value = 0.5
+
+      const bandpass = ctx.createBiquadFilter()
+      bandpass.type = 'bandpass'
+      const clarity = this._waterClarity
+      bandpass.frequency.value = mapBrightness(this._brightness, baseFilterFreq) * (1 + clarity * 0.3)
+      bandpass.Q.value = 0.8
+
+      const detailFilter = ctx.createBiquadFilter()
+      detailFilter.type = 'highpass'
+      detailFilter.frequency.value = 1800
+      detailFilter.Q.value = 0.5
+
+      const detailGain = ctx.createGain()
+      detailGain.gain.value = clarity * 0.25
+
+      const surgeGain = ctx.createGain()
+      surgeGain.gain.value = 0.3
+
+      const surgeLFO = ctx.createOscillator()
+      surgeLFO.type = 'sine'
+      surgeLFO.frequency.value = this._currentMode === 'sleep' ? 0.08 : this._currentMode === 'focus' ? 0.15 : 0.11
+
+      const surgeDepth = ctx.createGain()
+      surgeDepth.gain.value = 0.12 * (1 - clarity * 0.3)
+
+      surgeLFO.connect(surgeDepth)
+      surgeDepth.connect(surgeGain.gain)
+      surgeLFO.start(now)
+
+      source.connect(lowpass)
+      lowpass.connect(surgeGain)
+      surgeGain.connect(bandpass)
+      lowpass.connect(detailFilter)
+      detailFilter.connect(detailGain)
+      detailGain.connect(bandpass)
+      bandpass.connect(panner)
+      panner.connect(gain)
+      gain.connect(this.ambientBus!)
+      source.start(now)
+
+      this.layers.set(name, {
+        source,
+        filter: bandpass,
+        panner,
+        gain,
+        baseGain: layerGain,
+        baseFilterFreq,
+        bodyFilter: lowpass,
+        surgeGain,
+        surgeDepth,
+        surgeLFO,
+        detailGain,
+        detailFilter,
+      })
+      return
+    }
+
     const filter = ctx.createBiquadFilter()
     filter.type = config.filterType
     filter.frequency.value = mapBrightness(this._brightness, baseFilterFreq)
     filter.Q.value = config.filterQ
-
-    const gain = ctx.createGain()
-    const layerGain = this.getLayerGain(name)
-    gain.gain.setValueAtTime(layerGain, now) // 层增益直接设为目标值
-
-    const panner = ctx.createStereoPanner()
-    panner.pan.value = getLayerPan(name, this._spatialLevel, this.preset)
 
     source.connect(filter)
     filter.connect(panner)
@@ -553,6 +669,25 @@ export class AudioEngine {
     source.start(now)
 
     this.layers.set(name, { source, filter, panner, gain, baseGain: layerGain, baseFilterFreq })
+  }
+
+  private rebuildWaterLayer(): void {
+    const water = this.layers.get('water')
+    if (!water || !this.ctx) return
+
+    const now = this.ctx.currentTime
+    const token = ++this._waterRebuildToken
+    water.gain.gain.setTargetAtTime(0, now, 0.3)
+    if (water.surgeLFO) {
+      try { water.surgeLFO.stop(now + 0.8) } catch { /* ignore */ }
+    }
+
+    setTimeout(() => {
+      if (this._waterRebuildToken !== token || !this._playing || !this.ctx) return
+      this.disconnectLayer(water)
+      this.layers.delete('water')
+      this.createNoiseLayer('water', this.ctx.currentTime)
+    }, 800)
   }
 
   private createDroneLayer(name: 'drone', now: number): void {
@@ -584,8 +719,6 @@ export class AudioEngine {
     this.layers.set(name, { source: osc, filter, panner, gain, baseGain: layerGain, baseFilterFreq: this.preset.droneFilter })
   }
 
-  // — 内部：工具 —
-
   private applyLayerGain(name: LayerName, value: number): void {
     const layer = this.layers.get(name)
     if (!layer || !this.ctx) return
@@ -616,7 +749,11 @@ export class AudioEngine {
   }
 
   private getNoiseBuffer(name: 'wind' | 'water'): AudioBuffer {
-    if (this._noiseBuffers[name]) return this._noiseBuffers[name]
+    const cacheKey = name === 'water' && this._currentMode
+      ? `${name}_${this._currentMode}`
+      : name
+
+    if (this._noiseBuffers[cacheKey]) return this._noiseBuffers[cacheKey]
     if (!USE_PINK_NOISE) return this.getNoiseBufferLegacy(name)
 
     const ctx = this.ctx!
@@ -625,16 +762,26 @@ export class AudioEngine {
     const buffer = ctx.createBuffer(1, length, sr)
     const data = buffer.getChannelData(0)
     const shaped = shapeForLayer(generatePinkNoise(length, sr), name, sr)
+    const mode = this._currentMode || 'meditate'
 
     for (let i = 0; i < length; i++) {
-      const breath = name === 'wind'
-        ? 0.62 + 0.38 * Math.sin((i / sr) * Math.PI * 2 / 17 + Math.sin(i / sr / 11))
-        : 0.82 + 0.18 * Math.sin((i / sr) * Math.PI * 2 / 9.5)
+      let breath: number
+      if (name === 'wind') {
+        breath = 0.62 + 0.38 * Math.sin((i / sr) * Math.PI * 2 / 17 + Math.sin(i / sr / 11))
+      } else {
+        const t = i / sr
+        const surgeRate = mode === 'sleep' ? 0.08 : mode === 'focus' ? 0.15 : 0.11
+        const surge = Math.sin(t * Math.PI * 2 * surgeRate) * 0.15
+        const undulation = Math.sin(t * Math.PI * 2 * 0.31 + Math.sin(t * 0.13)) * 0.08
+        const ripple = Math.sin(t * Math.PI * 2 * 2.7 + Math.sin(t * 0.7)) * 0.03
+        const baseLevel = mode === 'sleep' ? 0.85 : mode === 'focus' ? 0.75 : 0.80
+        breath = Math.max(0.4, Math.min(1.0, baseLevel + surge + undulation + ripple))
+      }
       data[i] = shaped[i] * breath
     }
-    data.set(applyLoopCrossfade(data, sr, LOOP_CROSSFADE_SECONDS))
 
-    this._noiseBuffers[name] = buffer
+    data.set(applyLoopCrossfade(data, sr, LOOP_CROSSFADE_SECONDS))
+    this._noiseBuffers[cacheKey] = buffer
     return buffer
   }
 
@@ -649,9 +796,7 @@ export class AudioEngine {
 
     const win = Math.floor(sr * (name === 'wind' ? 0.035 : 0.006))
     let sum = 0
-    for (let j = 0; j < win; j++) {
-      sum += raw[j % length]
-    }
+    for (let j = 0; j < win; j++) sum += raw[j % length]
     for (let i = 0; i < length; i++) {
       const breath = name === 'wind'
         ? 0.62 + 0.38 * Math.sin((i / sr) * Math.PI * 2 / 17 + Math.sin(i / sr / 11))
@@ -689,7 +834,11 @@ export class AudioEngine {
 
     if (water) {
       water.gain.gain.setTargetAtTime(this.getLayerGain('water') * rand(0.9, 1.08), now, rand(3, 6))
-      water.filter.frequency.setTargetAtTime(mapBrightness(this._brightness, this.preset.waterFilter) * rand(0.9, 1.12), now, rand(3, 6))
+      water.filter.frequency.setTargetAtTime(
+        mapBrightness(this._brightness, this.preset.waterFilter) * (1 + this._waterClarity * 0.3) * rand(0.9, 1.12),
+        now,
+        rand(3, 6),
+      )
       water.panner.pan.setTargetAtTime(getLayerPan('water', this._spatialLevel, this.preset) + rand(-0.03, 0.03), now, rand(3, 6))
     }
 
@@ -699,8 +848,6 @@ export class AudioEngine {
     }
   }
 }
-
-// — 工具函数 —
 
 function clamp(v: number): number {
   return Math.max(0, Math.min(1, v))
@@ -735,7 +882,6 @@ function generatePinkNoise(length: number, sampleRate: number): Float32Array {
 }
 
 function shapeForLayer(samples: Float32Array, name: 'wind' | 'water', sampleRate: number): Float32Array {
-  // 1/f noise is the natural bed; wind tilts down like air through leaves, water keeps a gentler high band.
   return name === 'wind'
     ? applyAirBandShape(samples, sampleRate)
     : applyStreamBandShape(samples, sampleRate)
@@ -754,11 +900,9 @@ function applyStreamBandShape(samples: Float32Array, sampleRate: number): Float3
   const lifted = applyGentleHighpass(samples, sampleRate, 800)
   const softened = applyOnePoleLowpass(lifted, sampleRate, 4800)
   const out = new Float32Array(samples.length)
-
   for (let i = 0; i < samples.length; i++) {
     out[i] = lifted[i] * 0.65 + softened[i] * 0.35
   }
-
   return out
 }
 
@@ -769,9 +913,7 @@ function applyLoopCrossfade(samples: Float32Array, sampleRate: number, fadeSecon
     Math.max(2, Math.floor(sampleRate * fadeSeconds)),
   )
   if (fadeSamples < 2) return out
-
   const tailStart = samples.length - fadeSamples
-
   for (let i = 0; i < fadeSamples; i++) {
     const t = i / (fadeSamples - 1)
     const fadeIn = Math.sin(t * Math.PI / 2)
@@ -779,7 +921,6 @@ function applyLoopCrossfade(samples: Float32Array, sampleRate: number, fadeSecon
     out[i] = samples[i] * fadeIn + samples[tailStart + i] * fadeOut
     out[tailStart + i] = samples[tailStart + i] * fadeOut + samples[i] * fadeIn
   }
-
   return out
 }
 
@@ -789,23 +930,19 @@ function applyOnePoleLowpass(samples: Float32Array, sampleRate: number, cutoffHz
   const dt = 1 / sampleRate
   const alpha = dt / (rc + dt)
   let state = 0
-
   for (let i = 0; i < samples.length; i++) {
     state += alpha * (samples[i] - state)
     out[i] = state
   }
-
   return out
 }
 
 function applyGentleHighpass(samples: Float32Array, sampleRate: number, cutoffHz: number): Float32Array {
   const out = new Float32Array(samples.length)
   const low = applyOnePoleLowpass(samples, sampleRate, cutoffHz)
-
   for (let i = 0; i < samples.length; i++) {
     out[i] = samples[i] * 0.5 + (samples[i] - low[i]) * 0.5
   }
-
   return out
 }
 
@@ -818,13 +955,11 @@ function generateMountainValleyIR(ctx: BaseAudioContext, durationSec = 6): Audio
   for (let ch = 0; ch < 2; ch++) {
     const data = ir.getChannelData(ch)
     let lpfState = 0
-
     for (let i = 0; i < length; i++) {
       if (i < preDelaySamples) {
         data[i] = (Math.random() * 2 - 1) * 0.002
         continue
       }
-
       const t = (i - preDelaySamples) / sr
       const totalT = durationSec - 0.08
       const envelope = Math.exp(-3.0 * t / totalT)
@@ -832,7 +967,6 @@ function generateMountainValleyIR(ctx: BaseAudioContext, durationSec = 6): Audio
       const earlyReflection = t > 0.4 && t < 2.0 && Math.random() < 0.015
         ? (Math.random() * 2 - 1) * 0.3
         : 0
-
       const raw = (noise * envelope + earlyReflection) * 0.5
       const age = i / length
       const alpha = 0.05 + age * 0.3
@@ -840,7 +974,6 @@ function generateMountainValleyIR(ctx: BaseAudioContext, durationSec = 6): Audio
       data[i] = lpfState
     }
   }
-
   return ir
 }
 
@@ -857,7 +990,6 @@ function rand(min: number, max: number): number {
   return min + Math.random() * (max - min)
 }
 
-/** 全局单例 */
 export const audioEngine = new AudioEngine()
 
 if (typeof window !== 'undefined') {
