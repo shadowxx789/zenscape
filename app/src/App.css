@@ -531,3 +531,28 @@ button {
     grid-template-columns: 180px 1fr;
   }
 }
+
+/* 声音来源（CC BY 署名） */
+.sound-credits {
+  margin: 2rem auto 1.5rem;
+  max-width: 40rem;
+  padding: 0 1.25rem;
+  font-size: 0.78rem;
+  line-height: 1.6;
+  color: rgba(233, 211, 164, 0.55);
+}
+.sound-credits summary {
+  cursor: pointer;
+  letter-spacing: 0.08em;
+}
+.sound-credits summary:focus-visible {
+  outline: 1px solid rgba(233, 211, 164, 0.6);
+  outline-offset: 3px;
+}
+.sound-credits ul {
+  margin: 0.5rem 0 0;
+  padding-left: 1.1rem;
+}
+.sound-credits a {
+  color: rgba(233, 211, 164, 0.8);
+}

@@ -3,7 +3,7 @@ import { MODE_DETAILS } from './ModeSelector'
 import type { SoundParams } from '../audio/soundParams'
 import { computeParams, getPhase, type Phase } from '../audio/rules'
 import type { Mode } from '../types'
-import { audioEngine } from '../audio/AudioEngine'
+import { engine as audioEngine } from '../audio/engine'
 import { ParticleCanvas } from './ParticleCanvas'
 import sessionImage from '../assets/zen-night-valley.jpg'
 
@@ -70,10 +70,11 @@ export function SessionView({
     return clearTimer
   }, [isPlaying, clearTimer])
 
-  // 卸载清理
+  // 新会话（v2：新种子、从头开始）；卸载清理
   useEffect(() => {
+    audioEngine.prepareSession?.(mode, totalSeconds)
     return () => { audioEngine.stopImmediate() }
-  }, [])
+  }, [mode, totalSeconds])
 
   // 页面回到前台时恢复 AudioContext（浏览器会在后台挂起它）
   useEffect(() => {
@@ -95,6 +96,8 @@ export function SessionView({
   // M4：规则引擎——每 4 秒根据进度重新计算参数
   useEffect(() => {
     if (!isPlaying || isFinished) return
+    // v2：阶段变化（入定→深境→回转的疏密、轻重）已写进乐谱，滑杆保持用户的值
+    if (audioEngine.ownsDynamics) return
 
     const tick = () => {
       const progress = 1 - remainingRef.current / totalSecondsRef.current
@@ -151,6 +154,7 @@ export function SessionView({
 
   const handleRestart = () => {
     audioEngine.stopImmediate()
+    audioEngine.prepareSession?.(mode, totalSeconds)
     userTouched.current.clear()
     setRemaining(totalSeconds)
     setIsFinished(false)

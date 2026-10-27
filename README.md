@@ -29,6 +29,7 @@
 | 📜 [APP_SPEC.md](APP_SPEC.md) | MVP 规格（历史档案） |
 | 🔊 [SOUND_SPEC.md](SOUND_SPEC.md) | 声音规格（历史档案） |
 | ✅ [TASKS.md](TASKS.md) | M0-M7 任务（已完成） |
+| 🎧 [CREDITS.md](CREDITS.md) | 声音素材来源与授权（v2 引擎） |
 
 ---
 

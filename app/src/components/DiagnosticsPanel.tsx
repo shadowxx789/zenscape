@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { audioEngine } from '../audio/AudioEngine'
+import { engine as audioEngine } from '../audio/engine'
 import type { ProbeStats } from '../audio/AudioDiagnostics'
 import type { RecentEvent } from '../audio/AudioEngine'
 

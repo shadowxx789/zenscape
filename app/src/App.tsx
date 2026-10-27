@@ -10,6 +10,7 @@ import { loadPreferences, resetPreferences, savePreferences } from './storage/pr
 import heroImage from './assets/zen-bamboo-stream.jpg'
 import './App.css'
 import { DiagnosticsPanel } from './components/DiagnosticsPanel'
+import { SoundCredits } from './components/SoundCredits'
 
 // 启动时加载保存的偏好
 const saved = loadPreferences()
@@ -75,6 +76,8 @@ function App() {
               开始声景
             </button>
           </div>
+
+          <SoundCredits />
         </main>
       )}
       <DiagnosticsPanel />
