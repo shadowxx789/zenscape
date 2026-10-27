@@ -4,3 +4,6 @@ dist-ssr/
 *.local
 .DS_Store
 .vite/
+
+# local A/B audition renders (not tracked)
+ab-demo/
