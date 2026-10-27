@@ -540,7 +540,7 @@
 }
 
 .session-view.has-started::before {
-  opacity: 0.14;
+  opacity: 0.45;
 }
 
 .session-view::after {
