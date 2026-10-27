@@ -31,6 +31,7 @@ export function SessionView({
   const totalSeconds = duration * 60
   const [remaining, setRemaining] = useState(totalSeconds)
   const [isPlaying, setIsPlaying] = useState(false)
+  const [hasStarted, setHasStarted] = useState(false)
   const [isFinished, setIsFinished] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [sessionParams, setSessionParams] = useState<SoundParams>(initialSoundParams)
@@ -135,12 +136,16 @@ export function SessionView({
       setIsPlaying(false)
       audioEngine.stop()
     } else {
+      // 按下即退景：不等样本加载，失败时恢复原状态
+      const wasStarted = hasStarted
       try {
         setIsPlaying(true)
+        setHasStarted(true)
         setErrorMessage(null)
         await audioEngine.play()
       } catch (err) {
         setIsPlaying(false)
+        setHasStarted(wasStarted)
         const msg = err instanceof Error ? err.message : '无法初始化音频，请检查浏览器设置'
         setErrorMessage(msg)
       }
@@ -159,6 +164,7 @@ export function SessionView({
     setRemaining(totalSeconds)
     setIsFinished(false)
     setIsPlaying(false)
+    setHasStarted(false)
     setErrorMessage(null)
   }
 
@@ -180,7 +186,7 @@ export function SessionView({
 
   return (
     <main
-      className={`session-view ${isPlaying ? 'is-playing' : ''} ${isFinished ? 'is-finished' : ''}`}
+      className={`session-view ${isPlaying ? 'is-playing' : ''} ${hasStarted ? 'has-started' : ''} ${isFinished ? 'is-finished' : ''}`}
       aria-label="声景会话"
       style={{ '--session-bg': `url(${sessionImage})` } as React.CSSProperties}
     >
@@ -188,6 +194,7 @@ export function SessionView({
         isPlaying={isPlaying}
         brightness={sessionParams.brightness}
         recentPans={audioEngine.getRecentEvents().map(e => e.pan)}
+        showAmbient={!hasStarted}
       />
 
       <header className="session-header">
@@ -292,7 +299,7 @@ export function SessionView({
             </div>
           </details>
         )}
-        <p className="zen-quote">竹影扫阶尘不动，月穿潭底水无痕</p>
+        <p className="zen-quote" aria-hidden={hasStarted && !isFinished}>竹影扫阶尘不动，月穿潭底水无痕</p>
       </div>
     </main>
   )

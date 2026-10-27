@@ -34,22 +34,25 @@ type ParticleCanvasProps = {
   isPlaying: boolean
   brightness: number
   recentPans?: number[] // 由 AudioEngine 传入的事件 pan 位置
+  showAmbient?: boolean
 }
 
 const ORB_COUNT = 4
 const ORB_BASE_RADIUS = 60
 
-export function ParticleCanvas({ isPlaying, brightness, recentPans }: ParticleCanvasProps) {
+export function ParticleCanvas({ isPlaying, brightness, recentPans, showAmbient = true }: ParticleCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const orbsRef = useRef<Orb[]>([])
   const ripplesRef = useRef<Ripple[]>([])
   const animRef = useRef<number>(0)
   const isPlayingRef = useRef(isPlaying)
   const brightnessRef = useRef(brightness)
+  const showAmbientRef = useRef(showAmbient)
   const lastEventCountRef = useRef(0)
 
   useEffect(() => { isPlayingRef.current = isPlaying }, [isPlaying])
   useEffect(() => { brightnessRef.current = brightness }, [brightness])
+  useEffect(() => { showAmbientRef.current = showAmbient }, [showAmbient])
 
   // 事件触发涟漪
   useEffect(() => {
@@ -129,7 +132,7 @@ export function ParticleCanvas({ isPlaying, brightness, recentPans }: ParticleCa
       // ── 环境 orb（呼吸微光）──
       for (const orb of orbsRef.current) {
         const breath = Math.sin(time * orb.speed + orb.phase) * 0.5 + 0.5
-        const alpha = orb.maxOpacity * breath * globalFade * brightnessFactor
+        const alpha = orb.maxOpacity * breath * globalFade * brightnessFactor * (showAmbientRef.current ? 1 : 0)
         if (alpha < 0.002) continue
 
         const drift = prefersReducedMotion ? 0 : 0.1

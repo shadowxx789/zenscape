@@ -53,7 +53,6 @@ function App() {
 
           <header className="home-header">
             <div className="brand-lockup" aria-label="竹间息 BreezeScape">
-              <span className="brand-mark" aria-hidden="true" />
               <span className="brand-name">竹间息</span>
               <span className="brand-sub">BREEZESCAPE</span>
             </div>

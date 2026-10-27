@@ -31,16 +31,16 @@
 .home-landscape {
   z-index: -3;
   object-fit: cover;
-  object-position: 52% center;
-  filter: saturate(0.66) brightness(0.76) contrast(0.94);
-  transform: scale(1.015);
+  object-position: 42% center;
+  filter: saturate(0.58) brightness(0.74) contrast(0.92) blur(1.2px);
+  transform: scale(1.025);
 }
 
 .home-veil {
   z-index: -2;
   background:
-    linear-gradient(90deg, rgba(8, 13, 10, 0.9) 0%, rgba(8, 13, 10, 0.69) 42%, rgba(8, 13, 10, 0.8) 100%),
-    linear-gradient(0deg, rgba(7, 11, 9, 0.88) 0%, transparent 42%, rgba(7, 11, 9, 0.32) 100%);
+    linear-gradient(90deg, rgba(8, 13, 10, 0.58) 0%, rgba(8, 13, 10, 0.34) 31%, rgba(8, 13, 10, 0.68) 49%, rgba(12, 17, 14, 0.95) 64%, #0c110e 100%),
+    linear-gradient(0deg, rgba(7, 11, 9, 0.74) 0%, transparent 45%, rgba(7, 11, 9, 0.24) 100%);
 }
 
 .home-header,
@@ -61,17 +61,6 @@
   display: flex;
   align-items: center;
   color: var(--text-h);
-}
-
-.brand-mark {
-  width: 25px;
-  height: 25px;
-  margin-right: 13px;
-  border: 1px solid var(--accent);
-  border-right-color: transparent;
-  border-radius: 50%;
-  opacity: 0.82;
-  transform: rotate(-38deg);
 }
 
 .brand-name {
@@ -125,10 +114,10 @@
   margin: 0;
   color: var(--text-h);
   font-family: var(--font-display);
-  font-size: clamp(68px, 7.4vw, 108px);
+  font-size: clamp(60px, 6.3vw, 92px);
   font-weight: 400;
   line-height: 1.22;
-  letter-spacing: 0.09em;
+  letter-spacing: 0.055em;
   text-wrap: balance;
 }
 
@@ -138,7 +127,7 @@
   color: #c4c6bc;
   font-size: 14px;
   line-height: 2.05;
-  letter-spacing: 0.045em;
+  letter-spacing: 0.02em;
   text-wrap: pretty;
 }
 
@@ -235,10 +224,10 @@
 .duration-pill.is-selected::after {
   content: "";
   position: absolute;
-  right: 24%;
+  right: 16%;
   bottom: -1px;
-  left: 24%;
-  height: 1px;
+  left: 16%;
+  height: 2px;
   background: var(--accent);
 }
 
@@ -544,7 +533,14 @@
   z-index: -2;
   background: var(--session-bg) center / cover no-repeat;
   filter: brightness(0.62) saturate(0.58);
+  opacity: 1;
   transform: scale(1.02);
+  transition: opacity 12s var(--ease-quiet);
+  will-change: opacity;
+}
+
+.session-view.has-started::before {
+  opacity: 0.14;
 }
 
 .session-view::after {
@@ -846,6 +842,11 @@
   font-size: 11px;
   line-height: 1.8;
   letter-spacing: 0.16em;
+  transition: opacity 1.4s ease;
+}
+
+.session-view.has-started:not(.is-finished) .zen-quote {
+  opacity: 0;
 }
 
 .option-card:focus-visible,
@@ -865,7 +866,7 @@ summary:focus-visible,
 
 @media (min-width: 901px) and (max-height: 780px) {
   .home-layout { padding: 26px 0 20px; }
-  .hero-panel h1 { font-size: clamp(62px, 6.6vw, 86px); }
+  .hero-panel h1 { font-size: clamp(56px, 5.8vw, 74px); }
   .section-kicker { margin-bottom: 18px; }
   .hero-copy { margin-top: 19px; }
   .selector-block { margin-bottom: 20px; }
@@ -886,13 +887,12 @@ summary:focus-visible,
     padding: 54px 0 34px;
   }
   .hero-content { max-width: 560px; }
-  .hero-panel h1 { font-size: clamp(62px, 11vw, 88px); }
+  .hero-panel h1 { font-size: clamp(56px, 10vw, 74px); }
   .setup-panel { width: min(100%, 560px); }
-  .home-landscape { object-position: 60% center; }
+  .home-landscape { object-position: 38% center; }
   .home-veil {
     background:
-      linear-gradient(90deg, rgba(8, 13, 10, 0.88), rgba(8, 13, 10, 0.68)),
-      linear-gradient(0deg, rgba(7, 11, 9, 0.9), transparent 55%, rgba(7, 11, 9, 0.4));
+      linear-gradient(180deg, rgba(8, 13, 10, 0.36) 0%, rgba(8, 13, 10, 0.44) 28%, rgba(12, 17, 14, 0.9) 46%, #0c110e 59%, #0c110e 100%);
   }
 }
 
@@ -903,11 +903,10 @@ summary:focus-visible,
   }
   .brand-name { font-size: 17px; }
   .brand-sub { margin-left: 12px; padding-left: 12px; font-size: 8px; }
-  .brand-mark { width: 22px; height: 22px; margin-right: 10px; }
   .header-note { display: none; }
   .home-layout { gap: 35px; padding: 45px 0 22px; }
   .section-kicker { margin-bottom: 17px; font-size: 10px; }
-  .hero-panel h1 { font-size: clamp(54px, 17vw, 72px); line-height: 1.18; }
+  .hero-panel h1 { font-size: clamp(48px, 14.5vw, 60px); line-height: 1.18; }
   .hero-copy { margin-top: 20px; font-size: 13px; line-height: 1.95; }
   .hero-copy br { display: none; }
   .selector-block { margin-bottom: 24px; }
