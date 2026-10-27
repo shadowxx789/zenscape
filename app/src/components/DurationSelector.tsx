@@ -19,14 +19,17 @@ export function DurationSelector({ value, onChange }: DurationSelectorProps) {
     if (n > 0 && n <= 180) {
       onChange(n)
       setCustomMode(false)
+      setCustomValue('')
     }
   }
 
   return (
-    <section className="selector-block" aria-labelledby="duration-heading">
-      <div className="section-kicker">Duration</div>
-      <h2 id="duration-heading">选择时长</h2>
-      <div className="option-grid duration-grid" role="radiogroup" aria-label="会话时长">
+    <section className="selector-block duration-selector" aria-labelledby="duration-heading">
+      <div className="selector-heading">
+        <h2 id="duration-heading">留多久</h2>
+        <span className="selector-note">分钟</span>
+      </div>
+      <div className="option-grid duration-grid" role="radiogroup" aria-label="会话时长（分钟）">
         {DURATIONS.map((duration) => (
           <button
             key={duration}
@@ -38,50 +41,47 @@ export function DurationSelector({ value, onChange }: DurationSelectorProps) {
             }}
             role="radio"
             aria-checked={value === duration}
+            aria-label={`${duration} 分钟`}
           >
             {duration}
-            <span>min</span>
           </button>
         ))}
-        <button
-          type="button"
-          className={`duration-pill duration-pill--custom ${!isPreset && !customMode ? 'is-selected' : ''} ${customMode ? 'is-editing' : ''}`}
-          onClick={() => setCustomMode(true)}
-          role="radio"
-          aria-checked={!isPreset}
-        >
-          {customMode ? (
-            <form
-              className="custom-duration-form"
-              onSubmit={(e) => {
-                e.preventDefault()
-                handleCustomSubmit()
-              }}
-            >
-              <input
-                type="number"
-                min={1}
-                max={180}
-                value={customValue}
-                onChange={(e) => setCustomValue(e.target.value)}
-                className="custom-duration-input"
-                placeholder="分钟"
-                autoFocus
-                aria-label="自定义时长（分钟）"
-              />
-            </form>
-          ) : !isPreset ? (
-            <>
-              {value}
-              <span>min</span>
-            </>
-          ) : (
-            <>
-              ?
-              <span>min</span>
-            </>
-          )}
-        </button>
+        {customMode ? (
+          <form
+            className="custom-duration-form duration-pill is-editing"
+            onSubmit={(e) => {
+              e.preventDefault()
+              handleCustomSubmit()
+            }}
+          >
+            <input
+              type="number"
+              min={1}
+              max={180}
+              inputMode="numeric"
+              value={customValue}
+              onChange={(e) => setCustomValue(e.target.value)}
+              className="custom-duration-input"
+              placeholder="1–180"
+              autoFocus
+              aria-label="自定义时长（分钟）"
+            />
+            <button type="submit" className="custom-duration-submit" aria-label="确认自定义时长">
+              确定
+            </button>
+          </form>
+        ) : (
+          <button
+            type="button"
+            className={`duration-pill duration-pill--custom ${!isPreset ? 'is-selected' : ''}`}
+            onClick={() => setCustomMode(true)}
+            role="radio"
+            aria-checked={!isPreset}
+            aria-label={!isPreset ? `自定义 ${value} 分钟` : '自定义时长'}
+          >
+            {!isPreset ? value : '自定'}
+          </button>
+        )}
       </div>
     </section>
   )

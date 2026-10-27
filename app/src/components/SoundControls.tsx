@@ -27,9 +27,7 @@ export function SoundControls({ params, onChange }: SoundControlsProps) {
   }
 
   return (
-    <section className="selector-block sound-controls" aria-labelledby="controls-heading">
-      <div className="section-kicker">Sound</div>
-      <h2 id="controls-heading">声音调节</h2>
+    <div className="sound-controls" aria-label="声音调节">
       <div className="slider-grid">
         {SLIDERS.map((s) => (
           <div key={s.key} className="slider-row">
@@ -46,16 +44,16 @@ export function SoundControls({ params, onChange }: SoundControlsProps) {
               onChange={(e) => handleChange(s.key, Number(e.target.value))}
               className="zen-slider"
               style={{
-                background: `linear-gradient(to right, var(--accent) 0%, var(--accent) ${params[s.key] * 100}%, rgba(233, 211, 164, 0.15) ${params[s.key] * 100}%)`,
+                backgroundImage: `linear-gradient(to right, var(--accent) 0%, var(--accent) ${params[s.key] * 100}%, var(--slider-track) ${params[s.key] * 100}%)`,
               }}
               aria-label={s.label}
             />
-            <span className="slider-value">
+            <span className="slider-value" aria-hidden="true">
               {Math.round(params[s.key] * 100)}
             </span>
           </div>
         ))}
       </div>
-    </section>
+    </div>
   )
 }

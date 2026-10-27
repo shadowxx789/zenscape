@@ -180,7 +180,7 @@ export function SessionView({
 
   return (
     <main
-      className="session-view"
+      className={`session-view ${isPlaying ? 'is-playing' : ''} ${isFinished ? 'is-finished' : ''}`}
       aria-label="声景会话"
       style={{ '--session-bg': `url(${sessionImage})` } as React.CSSProperties}
     >
@@ -189,86 +189,110 @@ export function SessionView({
         brightness={sessionParams.brightness}
         recentPans={audioEngine.getRecentEvents().map(e => e.pan)}
       />
-      <div className="session-orb" aria-hidden="true">
-        <svg viewBox="0 0 184 184" className="orb-ring">
-          <circle cx="92" cy="92" r="90" fill="none" stroke="rgba(233,211,164,0.12)" strokeWidth="2" />
-          <circle
-            cx="92" cy="92" r="90"
-            fill="none"
-            stroke="rgba(233,211,164,0.5)"
-            strokeWidth="2.5"
-            strokeDasharray={`${progress * 565.5} 565.5`}
-            strokeLinecap="round"
-            transform="rotate(-90 92 92)"
-            style={{ transition: 'stroke-dasharray 1s linear' }}
-          />
-          <circle cx="92" cy="92" r="60" fill="rgba(233,211,164,0.1)" />
-        </svg>
-        <div className="orb-inner">
-          <div className="countdown" aria-label={`倒计时 ${formatTime(remaining)}`}>
-            {formatTime(remaining)}
+
+      <header className="session-header">
+        <button type="button" className="session-return" onClick={handleReturn}>
+          <span aria-hidden="true">←</span> 离开声景
+        </button>
+        <span className="session-wordmark">竹间息</span>
+        <span className="session-phase">{isFinished ? '圆满' : phaseLabel[currentPhase]}</span>
+      </header>
+
+      <section className="session-stage" aria-labelledby="session-title">
+        <h1 id="session-title" className="session-title">{MODE_DETAILS[mode].label}</h1>
+
+        <div className="session-orb">
+          <svg viewBox="0 0 184 184" className="orb-ring" aria-hidden="true">
+            <circle className="orb-track" cx="92" cy="92" r="88" fill="none" />
+            <circle
+              className="orb-progress"
+              cx="92"
+              cy="92"
+              r="88"
+              fill="none"
+              strokeDasharray={`${progress * 552.92} 552.92`}
+              transform="rotate(-90 92 92)"
+            />
+            <circle className="orb-breath" cx="92" cy="92" r="62" fill="none" />
+          </svg>
+          <div className="orb-inner">
+            <span className="countdown-label">{isFinished ? '声景已止' : isPlaying ? '此刻' : '准备'}</span>
+            <div className="countdown" role="timer" aria-label={`剩余时间 ${formatTime(remaining)}`}>
+              {formatTime(remaining)}
+            </div>
+            <span className="countdown-caption">剩余时间</span>
           </div>
         </div>
-      </div>
 
-      <p className="section-kicker">Session · {phaseLabel[currentPhase]}</p>
-      <h1>{MODE_DETAILS[mode].label}</h1>
-      <p className="zen-quote">竹影扫阶尘不动，月穿潭底水无痕</p>
-
-      {isFinished ? (
-        <p className="session-copy">一段声景结束了。</p>
-      ) : isPlaying ? (
-        <p className="session-copy">风从竹林来。</p>
-      ) : (
-        <p className="session-copy">点击播放，让声音慢慢醒来。</p>
-      )}
-
-      {errorMessage && (
-        <p className="session-copy error-message" style={{ color: '#cc7a7a', fontSize: '0.9rem', marginTop: '0.5rem' }}>
-          {errorMessage}
-        </p>
-      )}
-      {/* 会话中的迷你滑杆 */}
-      {isPlaying && !isFinished && (
-        <div className="session-sliders">
-          {([
-            ['masterVolume', '音量'],
-            ['natureLevel', '自然'],
-            ['instrumentLevel', '乐器'],
-            ['spatialLevel', '空间'],
-            ['brightness', '明亮'],
-          ] as const).map(([key, label]) => (
-            <div key={key} className="session-slider-row">
-              <label htmlFor={`ss-${key}`} className="session-slider-label">{label}</label>
-              <input
-                id={`ss-${key}`}
-                type="range"
-                min={0}
-                max={1}
-                step={0.01}
-                value={sessionParams[key]}
-                onChange={(e) => handleParamChange(key, Number(e.target.value))}
-                className="zen-slider zen-slider--sm"
-              />
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="session-actions">
         {isFinished ? (
-          <>
-            <button type="button" className="primary-action" onClick={handleRestart}>再来一次</button>
-            <button type="button" className="ghost-action" onClick={handleReturn}>返回首页</button>
-          </>
+          <p className="session-copy">一段声景结束了。片刻仍在。</p>
+        ) : isPlaying ? (
+          <p className="session-copy">不必追随声音，让它自行来去。</p>
         ) : (
-          <>
-            <button type="button" className="primary-action" onClick={handlePlayPause} aria-pressed={isPlaying}>
-              {isPlaying ? '暂停' : '播放'}
-            </button>
-            <button type="button" className="ghost-action" onClick={handleReturn}>返回首页</button>
-          </>
+          <p className="session-copy">按下播放，让声音慢慢醒来。</p>
         )}
+
+        {errorMessage && (
+          <p className="session-copy error-message" role="alert">
+            {errorMessage}
+          </p>
+        )}
+
+        {isFinished ? (
+          <div className="session-actions">
+            <button type="button" className="primary-action" onClick={handleRestart}>再来一次</button>
+            <button type="button" className="ghost-action" onClick={handleReturn}>回到首页</button>
+          </div>
+        ) : (
+          <div className="session-playback">
+            <button
+              type="button"
+              className="session-play-button"
+              onClick={handlePlayPause}
+              aria-pressed={isPlaying}
+              aria-label={isPlaying ? '暂停声景' : '播放声景'}
+            >
+              {isPlaying ? (
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6v12M16 6v12" /></svg>
+              ) : (
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 9 6-9 6Z" /></svg>
+              )}
+            </button>
+            <span className="session-play-label">{isPlaying ? '暂停' : '开始'}</span>
+          </div>
+        )}
+      </section>
+
+      <div className="session-bottom">
+        {isPlaying && !isFinished && (
+          <details className="session-tuning">
+            <summary>细调声音</summary>
+            <div className="session-sliders">
+              {([
+                ['masterVolume', '音量'],
+                ['natureLevel', '自然'],
+                ['instrumentLevel', '乐器'],
+                ['spatialLevel', '空间'],
+                ['brightness', '明亮'],
+              ] as const).map(([key, label]) => (
+                <div key={key} className="session-slider-row">
+                  <label htmlFor={`ss-${key}`} className="session-slider-label">{label}</label>
+                  <input
+                    id={`ss-${key}`}
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={sessionParams[key]}
+                    onChange={(e) => handleParamChange(key, Number(e.target.value))}
+                    className="zen-slider zen-slider--sm"
+                  />
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
+        <p className="zen-quote">竹影扫阶尘不动，月穿潭底水无痕</p>
       </div>
     </main>
   )

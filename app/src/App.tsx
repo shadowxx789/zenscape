@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { DurationSelector } from './components/DurationSelector'
-import { ModeSelector } from './components/ModeSelector'
+import { MODE_DETAILS, ModeSelector } from './components/ModeSelector'
 import { SessionView } from './components/SessionView'
 import { SoundControls } from './components/SoundControls'
 import type { SoundParams } from './audio/soundParams'
@@ -12,7 +12,6 @@ import './App.css'
 import { DiagnosticsPanel } from './components/DiagnosticsPanel'
 import { SoundCredits } from './components/SoundCredits'
 
-// 启动时加载保存的偏好
 const saved = loadPreferences()
 
 function App() {
@@ -21,7 +20,6 @@ function App() {
   const [soundParams, setSoundParams] = useState<SoundParams>(saved.soundParams)
   const [isSessionActive, setIsSessionActive] = useState(false)
 
-  // 偏好变更时自动保存
   useEffect(() => {
     savePreferences({ mode, duration, soundParams })
   }, [mode, duration, soundParams])
@@ -50,34 +48,54 @@ function App() {
         />
       ) : (
         <main className="home-view">
-          <section className="hero-panel" aria-labelledby="app-title">
-            <img className="hero-image" src={heroImage} alt="" aria-hidden="true" />
-            <div className="hero-content">
-              <p className="section-kicker">东方禅意 · 生成式冥想</p>
-              <h1 id="app-title">竹间息 <span className="brand-sub">BreezeScape</span></h1>
-              <p className="hero-copy">
-                选择一个场景，让风、水、钟与古琴慢慢生成一段不急着结束的安静。
-              </p>
+          <img className="home-landscape" src={heroImage} alt="" aria-hidden="true" />
+          <div className="home-veil" aria-hidden="true" />
+
+          <header className="home-header">
+            <div className="brand-lockup" aria-label="竹间息 BreezeScape">
+              <span className="brand-mark" aria-hidden="true" />
+              <span className="brand-name">竹间息</span>
+              <span className="brand-sub">BREEZESCAPE</span>
             </div>
-          </section>
+            <p className="header-note">生成式冥想声景</p>
+          </header>
 
-          <div className="setup-stack">
-            <ModeSelector value={mode} onChange={handleModeChange} />
-            <DurationSelector value={duration} onChange={setDuration} />
-            <SoundControls params={soundParams} onChange={setSoundParams} />
+          <div className="home-layout">
+            <section className="hero-panel" aria-labelledby="app-title">
+              <div className="hero-content">
+                <p className="section-kicker">风过竹林 · 水落石间</p>
+                <h1 id="app-title">且坐，<br />听风。</h1>
+                <p className="hero-copy">
+                  风、水、钟与古琴，慢慢生成一片不重复的声景。<br />
+                  不必做什么，只要在这里。
+                </p>
+              </div>
+            </section>
+
+            <section className="setup-panel" aria-label="声景设置">
+              <ModeSelector value={mode} onChange={handleModeChange} />
+              <DurationSelector value={duration} onChange={setDuration} />
+
+              <details className="sound-settings">
+                <summary>细调声音</summary>
+                <SoundControls params={soundParams} onChange={setSoundParams} />
+              </details>
+
+              <div className="home-actions">
+                <button type="button" className="start-button" onClick={() => setIsSessionActive(true)}>
+                  <span>进入声景</span>
+                  <span className="start-meta">{MODE_DETAILS[mode].label} · {duration} 分钟</span>
+                </button>
+                <button type="button" className="reset-button" onClick={handleResetPreferences}>
+                  恢复默认
+                </button>
+              </div>
+            </section>
           </div>
 
-          <div className="home-actions">
-            <button type="button" className="ghost-action reset-button" onClick={handleResetPreferences}>
-              恢复默认
-            </button>
-
-            <button type="button" className="start-button" onClick={() => setIsSessionActive(true)}>
-              开始声景
-            </button>
-          </div>
-
-          <SoundCredits />
+          <footer className="home-footer">
+            <SoundCredits />
+          </footer>
         </main>
       )}
       <DiagnosticsPanel />

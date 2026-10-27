@@ -22,9 +22,10 @@ type ModeSelectorProps = {
 
 export function ModeSelector({ value, onChange }: ModeSelectorProps) {
   return (
-    <section className="selector-block" aria-labelledby="mode-heading">
-      <div className="section-kicker">Mode</div>
-      <h2 id="mode-heading">选择声景</h2>
+    <section className="selector-block mode-selector" aria-labelledby="mode-heading">
+      <div className="selector-heading">
+        <h2 id="mode-heading">此刻，想要</h2>
+      </div>
       <div className="option-grid mode-grid" role="radiogroup" aria-label="冥想模式">
         {(Object.keys(MODE_DETAILS) as Mode[]).map((mode) => (
           <button
@@ -35,11 +36,12 @@ export function ModeSelector({ value, onChange }: ModeSelectorProps) {
             role="radio"
             aria-checked={value === mode}
           >
-            <span>{MODE_DETAILS[mode].label}</span>
-            <small>{MODE_DETAILS[mode].description}</small>
+            <span className="option-mark" aria-hidden="true" />
+            <span className="option-label">{MODE_DETAILS[mode].label}</span>
           </button>
         ))}
       </div>
+      <p className="mode-description" aria-live="polite">{MODE_DETAILS[value].description}</p>
     </section>
   )
 }
