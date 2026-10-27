@@ -659,20 +659,26 @@
 }
 
 .orb-breath {
-  stroke: rgba(200, 185, 145, 0.22);
+  stroke: rgba(200, 185, 145, 0.24);
   stroke-width: 0.65;
-  opacity: 0.45;
+  opacity: 0.3;
   transform-box: fill-box;
   transform-origin: center;
+  transform: scale(0.96);
+  /* 一次呼吸约 11 秒：吸 4.5 秒、呼 6.5 秒（含末尾短暂停顿），约每分钟 5.5 次 */
+  animation: orb-breath 11s infinite;
+  animation-play-state: paused;
 }
 
 .session-view.is-playing .orb-breath {
-  animation: orb-breath 9s ease-in-out infinite;
+  animation-play-state: running;
 }
 
 @keyframes orb-breath {
-  0%, 100% { opacity: 0.25; transform: scale(0.94); }
-  50% { opacity: 0.8; transform: scale(1.08); }
+  0% { opacity: 0.3; transform: scale(0.96); animation-timing-function: cubic-bezier(0.37, 0, 0.63, 1); }
+  41% { opacity: 0.85; transform: scale(1.035); animation-timing-function: cubic-bezier(0.33, 0, 0.5, 1); }
+  92% { opacity: 0.3; transform: scale(0.96); }
+  100% { opacity: 0.3; transform: scale(0.96); }
 }
 
 .orb-inner {
@@ -939,6 +945,14 @@ summary:focus-visible,
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .session-view::before {
+    transition: none !important;
+  }
+
+  .orb-breath {
+    animation: none !important;
+  }
+
   *,
   *::before,
   *::after {

@@ -1,216 +1,254 @@
 /**
- * ParticleCanvas — BreezeScape M6 禅意粒子艺术
+ * ParticleCanvas — 会话里的光
  *
- * 涟漪粒子系统：
- * - 平时只有 3-5 个 orb 在画面里缓慢呼吸
- * - 事件（钟声/古琴）触发时，从事件 pan 位置扩散出一圈涟漪
- * - 涟漪扩散后自然衰减消失
+ * - 环境光斑：两颗，分居画面左右，慢慢明灭、几乎不动；避开中间的圆环与时间
+ * - 钟声：从圆环向外散开一圈极淡的金线，像声音在山谷里散开
+ * - 古琴：在圆环上按声像方向亮起一小段弧，像被拨了一下
+ *
+ * 全部按真实时间推进（与屏幕刷新率无关），按设备像素比绘制；没有东西可画时停止渲染循环。
  */
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type RefObject } from 'react'
+import type { RecentEvent } from '../audio/AudioEngine'
 
-// ── 环境微光 ──
 interface Orb {
-  x: number
-  y: number
+  /** 归一化坐标（0–1），随窗口尺寸换算 */
+  nx: number
+  ny: number
   radius: number
-  phase: number // 呼吸相位
-  speed: number // 呼吸速度
+  phase: number
+  speed: number
   maxOpacity: number
+  driftPhase: number
 }
 
-// ── 事件涟漪 ──
-interface Ripple {
-  x: number
-  y: number
-  radius: number
-  maxRadius: number
-  opacity: number
-  speed: number
-  width: number
+interface Wave {
+  kind: 'bell' | 'qin'
+  born: number
+  /** 古琴弧所在角度（弧度，0 = 右，-π/2 = 上） */
+  angle: number
 }
 
 type ParticleCanvasProps = {
   isPlaying: boolean
   brightness: number
-  recentPans?: number[] // 由 AudioEngine 传入的事件 pan 位置
-  showAmbient?: boolean
+  /** 取最近事件（最新在前）；由画布自己轮询，不靠 React 重渲染 */
+  getEvents: () => RecentEvent[]
+  /** 圆环元素：涟漪从这里生出 */
+  anchorRef: RefObject<HTMLElement | null>
 }
 
-const ORB_COUNT = 4
-const ORB_BASE_RADIUS = 60
+const BELL_LIFE = 7.5 // 秒
+const QIN_LIFE = 2.6
+const ORB_FADE = 2.5 // 播放/暂停时光斑渐入渐出的时间
+const POLL_MS = 200
+const GOLD = '200, 185, 145'
+const MIST = '166, 190, 170'
 
-export function ParticleCanvas({ isPlaying, brightness, recentPans, showAmbient = true }: ParticleCanvasProps) {
+function makeOrbs(): Orb[] {
+  // 一左一右，纵向错开；远离中间三分之一
+  const sides = [
+    [0.12 + Math.random() * 0.14, 0.28 + Math.random() * 0.2],
+    [0.74 + Math.random() * 0.14, 0.52 + Math.random() * 0.2],
+  ]
+  return sides.map(([nx, ny]) => ({
+    nx,
+    ny,
+    radius: 110 + Math.random() * 60,
+    phase: Math.random() * Math.PI * 2,
+    speed: 0.14 + Math.random() * 0.08, // 约 30–45 秒一次明灭
+    maxOpacity: 0.085 + Math.random() * 0.03,
+    driftPhase: Math.random() * Math.PI * 2,
+  }))
+}
+
+const easeOut = (x: number) => 1 - Math.pow(1 - x, 3)
+
+export function ParticleCanvas({ isPlaying, brightness, getEvents, anchorRef }: ParticleCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const orbsRef = useRef<Orb[]>([])
-  const ripplesRef = useRef<Ripple[]>([])
-  const animRef = useRef<number>(0)
   const isPlayingRef = useRef(isPlaying)
   const brightnessRef = useRef(brightness)
-  const showAmbientRef = useRef(showAmbient)
-  const lastEventCountRef = useRef(0)
+  const getEventsRef = useRef(getEvents)
+  const kickRef = useRef<() => void>(() => undefined)
 
-  useEffect(() => { isPlayingRef.current = isPlaying }, [isPlaying])
   useEffect(() => { brightnessRef.current = brightness }, [brightness])
-  useEffect(() => { showAmbientRef.current = showAmbient }, [showAmbient])
-
-  // 事件触发涟漪
+  useEffect(() => { getEventsRef.current = getEvents }, [getEvents])
   useEffect(() => {
-    if (!recentPans || recentPans.length === 0) return
-    const canvas = canvasRef.current
-    if (!canvas) return
+    isPlayingRef.current = isPlaying
+    kickRef.current()
+  }, [isPlaying])
 
-    const currentCount = recentPans.length
-    if (currentCount <= lastEventCountRef.current) return
-
-    // 新事件 → 在对应 pan 位置产生涟漪
-    for (let i = lastEventCountRef.current; i < currentCount; i++) {
-      const pan = recentPans[i] ?? 0
-      // pan [-1,1] → x position
-      const x = canvas.width * (0.5 + pan * 0.4)
-      const y = canvas.height * 0.55 // 画面中下部，视觉中心偏下
-      ripplesRef.current.push({
-        x, y,
-        radius: 10,
-        maxRadius: 200 + Math.random() * 120,
-        opacity: 0.6 + Math.random() * 0.2,
-        speed: 1.2 + Math.random() * 0.8,
-        width: 1.5 + Math.random() * 1.5,
-      })
-    }
-    // 限制涟漪数量
-    if (ripplesRef.current.length > 20) {
-      ripplesRef.current = ripplesRef.current.slice(-20)
-    }
-    lastEventCountRef.current = currentCount
-  }, [recentPans])
-
-  // 初始化环境 orb
   useEffect(() => {
     const canvas = canvasRef.current
-    if (!canvas || orbsRef.current.length > 0) return
-    orbsRef.current = Array.from({ length: ORB_COUNT }, () => ({
-      x: canvas.width * (0.15 + Math.random() * 0.7),
-      y: canvas.height * (0.2 + Math.random() * 0.6),
-      radius: ORB_BASE_RADIUS + Math.random() * 60,
-      phase: Math.random() * Math.PI * 2,
-      speed: 0.3 + Math.random() * 0.5,
-      maxOpacity: 0.06 + Math.random() * 0.06,
-    }))
-  }, [])
+    const ctx = canvas?.getContext('2d')
+    if (!canvas || !ctx) return
 
-  // 主循环
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
+    const motionQuery = window.matchMedia?.('(prefers-reduced-motion: reduce)') ?? null
+    let reduced = motionQuery?.matches ?? false
+    const onMotion = (e: MediaQueryListEvent) => { reduced = e.matches }
+    motionQuery?.addEventListener('change', onMotion)
 
-    const mediaQuery = typeof window !== 'undefined' && window.matchMedia
-      ? window.matchMedia('(prefers-reduced-motion: reduce)')
-      : null
-    let prefersReducedMotion = mediaQuery ? mediaQuery.matches : false
-    const handleMotionChange = (e: MediaQueryListEvent) => { prefersReducedMotion = e.matches }
-    if (mediaQuery) mediaQuery.addEventListener('change', handleMotionChange)
-
+    let w = 0
+    let h = 0
     const resize = () => {
-      canvas.width = window.innerWidth
-      canvas.height = window.innerHeight
+      const dpr = Math.min(2, window.devicePixelRatio || 1)
+      w = window.innerWidth
+      h = window.innerHeight
+      canvas.width = Math.round(w * dpr)
+      canvas.height = Math.round(h * dpr)
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     }
     resize()
     window.addEventListener('resize', resize)
 
-    let time = 0
+    const orbs = makeOrbs()
+    const waves: Wave[] = []
+    // 只认这个时间点之后的事件：挂载前的旧事件不补画
+    let lastSeen = performance.now()
+    let lastPoll = 0
+    let orbLevel = 0 // 0–1，光斑整体亮度（跟随播放状态缓慢变化）
+    let raf = 0
+    let running = false
+    let prev = 0
+    let clock = 0
 
-    const animate = () => {
-      time += 0.016
-      ctx.clearRect(0, 0, canvas.width, canvas.height)
-
-      const globalFade = isPlayingRef.current ? 1 : 0
-      const brightnessFactor = brightnessRef.current
-
-      // ── 环境 orb（呼吸微光）──
-      for (const orb of orbsRef.current) {
-        const breath = Math.sin(time * orb.speed + orb.phase) * 0.5 + 0.5
-        const alpha = orb.maxOpacity * breath * globalFade * brightnessFactor * (showAmbientRef.current ? 1 : 0)
-        if (alpha < 0.002) continue
-
-        const drift = prefersReducedMotion ? 0 : 0.1
-        orb.x += Math.sin(time * 0.15 + orb.phase) * drift
-        orb.y += Math.cos(time * 0.12 + orb.phase * 1.3) * drift * 0.5
-
-        // ambient glow
-        const gradient = ctx.createRadialGradient(orb.x, orb.y, 0, orb.x, orb.y, orb.radius)
-        gradient.addColorStop(0, `rgba(166, 190, 170, ${alpha})`)
-        gradient.addColorStop(0.5, `rgba(166, 190, 170, ${alpha * 0.3})`)
-        gradient.addColorStop(1, 'rgba(166, 190, 170, 0)')
-        ctx.beginPath()
-        ctx.arc(orb.x, orb.y, orb.radius, 0, Math.PI * 2)
-        ctx.fillStyle = gradient
-        ctx.fill()
+    const poll = (now: number) => {
+      if (now - lastPoll < POLL_MS) return
+      lastPoll = now
+      const events = getEventsRef.current()
+      // 最新在前：从后往前推进，保持时间顺序
+      for (let i = events.length - 1; i >= 0; i--) {
+        const e = events[i]
+        if (e.time <= lastSeen) continue
+        lastSeen = e.time
+        waves.push({
+          kind: e.type === 'temple_bell' ? 'bell' : 'qin',
+          born: clock,
+          angle: -Math.PI / 2 + Math.max(-1, Math.min(1, e.pan)) * (Math.PI / 2),
+        })
       }
-
-      // ── 事件涟漪 ──
-      for (let i = ripplesRef.current.length - 1; i >= 0; i--) {
-        const r = ripplesRef.current[i]
-        if (!prefersReducedMotion) {
-          r.radius += r.speed
-        }
-        r.opacity *= 0.995
-
-        if (r.radius > r.maxRadius || r.opacity < 0.01) {
-          ripplesRef.current.splice(i, 1)
-          continue
-        }
-
-        const alpha = r.opacity * globalFade
-        if (alpha < 0.005) continue
-
-        // 涟漪圆环
-        ctx.beginPath()
-        ctx.arc(r.x, r.y, r.radius, 0, Math.PI * 2)
-        ctx.strokeStyle = `rgba(200, 220, 205, ${alpha * 0.6})`
-        ctx.lineWidth = r.width
-        ctx.stroke()
-
-        // 内圈微光
-        const fadeGrad = ctx.createRadialGradient(r.x, r.y, r.radius * 0.8, r.x, r.y, r.radius)
-        fadeGrad.addColorStop(0, 'rgba(200,220,205,0)')
-        fadeGrad.addColorStop(1, `rgba(200,220,205,${alpha * 0.1})`)
-        ctx.beginPath()
-        ctx.arc(r.x, r.y, r.radius, 0, Math.PI * 2)
-        ctx.fillStyle = fadeGrad
-        ctx.fill()
-      }
-
-      animRef.current = requestAnimationFrame(animate)
+      if (waves.length > 12) waves.splice(0, waves.length - 12)
     }
 
-    animRef.current = requestAnimationFrame(animate)
+    const anchor = () => {
+      const el = anchorRef.current
+      if (!el) return { cx: w / 2, cy: h * 0.45, r: Math.min(w, h) * 0.18 }
+      const b = el.getBoundingClientRect()
+      return { cx: b.left + b.width / 2, cy: b.top + b.height / 2, r: (b.width / 2) * (88 / 92) }
+    }
 
-    const handleVisibility = () => {
+    const frame = (now: number) => {
+      const dt = prev ? Math.min(0.1, (now - prev) / 1000) : 0
+      prev = now
+      clock += dt
+
+      if (isPlayingRef.current) poll(now)
+
+      const target = isPlayingRef.current ? 1 : 0
+      const step = dt / ORB_FADE
+      orbLevel = target > orbLevel ? Math.min(target, orbLevel + step) : Math.max(target, orbLevel - step)
+
+      ctx.clearRect(0, 0, w, h)
+      const lum = 0.6 + 0.8 * brightnessRef.current
+
+      // ── 环境光斑
+      if (orbLevel > 0.001) {
+        for (const o of orbs) {
+          const breath = Math.sin(clock * o.speed + o.phase) * 0.5 + 0.5
+          const alpha = o.maxOpacity * (0.35 + 0.65 * breath) * orbLevel * lum
+          const drift = reduced ? 0 : 1
+          const x = o.nx * w + Math.sin(clock * 0.03 + o.driftPhase) * 18 * drift
+          const y = o.ny * h + Math.cos(clock * 0.025 + o.driftPhase * 1.3) * 12 * drift
+          const g = ctx.createRadialGradient(x, y, 0, x, y, o.radius)
+          g.addColorStop(0, `rgba(${MIST}, ${alpha})`)
+          g.addColorStop(0.55, `rgba(${MIST}, ${alpha * 0.28})`)
+          g.addColorStop(1, `rgba(${MIST}, 0)`)
+          ctx.fillStyle = g
+          ctx.beginPath()
+          ctx.arc(x, y, o.radius, 0, Math.PI * 2)
+          ctx.fill()
+        }
+      }
+
+      // ── 钟与琴（暂停后已出现的照样散完）
+      if (waves.length) {
+        const { cx, cy, r } = anchor()
+        for (let i = waves.length - 1; i >= 0; i--) {
+          const wv = waves[i]
+          const age = clock - wv.born
+          const life = wv.kind === 'bell' ? BELL_LIFE : QIN_LIFE
+          if (age >= life) {
+            waves.splice(i, 1)
+            continue
+          }
+          const t = age / life
+          if (wv.kind === 'bell') {
+            // 一圈细线从圆环慢慢外扩到约 2.4 倍，先亮后淡
+            const rad = reduced ? r * 1.15 : r * (1 + 1.4 * easeOut(t))
+            const alpha = 0.4 * Math.sin(Math.PI * Math.min(1, t * 1.6 + 0.08)) * (1 - t) * lum
+            if (alpha <= 0.003) continue
+            ctx.strokeStyle = `rgba(${GOLD}, ${alpha})`
+            ctx.lineWidth = 0.8
+            ctx.beginPath()
+            ctx.arc(cx, cy, rad, 0, Math.PI * 2)
+            ctx.stroke()
+          } else {
+            // 圆环上一小段弧：快亮慢灭，略微外移
+            const rise = Math.min(1, t / 0.12)
+            const alpha = 0.7 * rise * Math.pow(1 - t, 1.6) * lum
+            if (alpha <= 0.003) continue
+            const span = 0.32 + 0.12 * t
+            const rad = r + (reduced ? 0 : 6 * easeOut(t))
+            ctx.strokeStyle = `rgba(${GOLD}, ${alpha})`
+            ctx.lineWidth = 1.6
+            ctx.lineCap = 'round'
+            ctx.beginPath()
+            ctx.arc(cx, cy, rad, wv.angle - span / 2, wv.angle + span / 2)
+            ctx.stroke()
+          }
+        }
+      }
+
+      // 没东西可画就停：暂停后光斑淡尽、涟漪散完即止
+      const idle = !isPlayingRef.current && orbLevel <= 0 && waves.length === 0
+      if (idle || document.hidden) {
+        running = false
+        prev = 0
+        return
+      }
+      raf = requestAnimationFrame(frame)
+    }
+
+    const start = () => {
+      if (running || document.hidden) return
+      running = true
+      prev = 0
+      raf = requestAnimationFrame(frame)
+    }
+    kickRef.current = start
+    if (isPlayingRef.current) start()
+
+    const onVisibility = () => {
       if (document.hidden) {
-        cancelAnimationFrame(animRef.current)
+        cancelAnimationFrame(raf)
+        running = false
       } else {
-        cancelAnimationFrame(animRef.current)
-        animRef.current = requestAnimationFrame(animate)
+        // 后台期间的事件不补画，免得回来时一起炸开
+        lastSeen = performance.now()
+        start()
       }
     }
-    document.addEventListener('visibilitychange', handleVisibility)
+    document.addEventListener('visibilitychange', onVisibility)
 
     return () => {
-      cancelAnimationFrame(animRef.current)
+      cancelAnimationFrame(raf)
+      running = false
+      kickRef.current = () => undefined
       window.removeEventListener('resize', resize)
-      document.removeEventListener('visibilitychange', handleVisibility)
-      if (mediaQuery) mediaQuery.removeEventListener('change', handleMotionChange)
+      document.removeEventListener('visibilitychange', onVisibility)
+      motionQuery?.removeEventListener('change', onMotion)
     }
-  }, [])
+  }, [anchorRef])
 
-  return (
-    <canvas
-      ref={canvasRef}
-      className="particle-canvas"
-      aria-hidden="true"
-    />
-  )
+  return <canvas ref={canvasRef} className="particle-canvas" aria-hidden="true" />
 }

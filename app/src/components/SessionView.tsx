@@ -7,6 +7,8 @@ import { engine as audioEngine } from '../audio/engine'
 import { ParticleCanvas } from './ParticleCanvas'
 import sessionImage from '../assets/zen-night-valley.jpg'
 
+const getRecentEvents = () => audioEngine.getRecentEvents()
+
 type SessionViewProps = {
   mode: Mode
   duration: number
@@ -36,6 +38,7 @@ export function SessionView({
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [sessionParams, setSessionParams] = useState<SoundParams>(initialSoundParams)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const orbRef = useRef<HTMLDivElement>(null)
   // 用户手动调过的参数，规则引擎不再覆盖
   const userTouched = useRef<Set<keyof SoundParams>>(new Set())
   // 用 ref 存最新 sessionParams，避免 useEffect 闭包问题
@@ -193,8 +196,8 @@ export function SessionView({
       <ParticleCanvas
         isPlaying={isPlaying}
         brightness={sessionParams.brightness}
-        recentPans={audioEngine.getRecentEvents().map(e => e.pan)}
-        showAmbient={!hasStarted}
+        getEvents={getRecentEvents}
+        anchorRef={orbRef}
       />
 
       <header className="session-header">
@@ -208,7 +211,7 @@ export function SessionView({
       <section className="session-stage" aria-labelledby="session-title">
         <h1 id="session-title" className="session-title">{MODE_DETAILS[mode].label}</h1>
 
-        <div className="session-orb">
+        <div className="session-orb" ref={orbRef}>
           <svg viewBox="0 0 184 184" className="orb-ring" aria-hidden="true">
             <circle className="orb-track" cx="92" cy="92" r="88" fill="none" />
             <circle
