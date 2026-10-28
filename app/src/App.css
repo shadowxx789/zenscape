@@ -631,8 +631,9 @@
   padding-left: 0.85em;
   border-left: 1px solid var(--border);
   color: var(--accent);
-  font-size: 0.8em;
-  letter-spacing: 0;
+  font-size: 0.7em;
+  letter-spacing: 0.16em;
+  white-space: nowrap;
 }
 
 .session-orb {

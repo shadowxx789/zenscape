@@ -206,8 +206,8 @@ export function SessionView({ mode, duration, density, onReturn }: SessionViewPr
       <section className="session-stage" aria-labelledby="session-title">
         <h1 id="session-title" className="session-title">
           {MODE_DETAILS[mode].label}
-          <span className="session-density" aria-label={`声音 ${DENSITY_DETAILS[density].label}`}>
-            {DENSITY_DETAILS[density].label}
+          <span className="session-density" aria-label={`声音：${DENSITY_DETAILS[density].short}`}>
+            {DENSITY_DETAILS[density].short}
           </span>
         </h1>
 
