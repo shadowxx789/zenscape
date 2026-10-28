@@ -111,6 +111,18 @@ export class SampleEngine {
     return this.ctx
   }
 
+  private useElement = false
+  private streamDest: MediaStreamAudioDestinationNode | null = null
+  private outEl: HTMLAudioElement | null = null
+  /** 实验（?bgtest=1 的 D 项）：图的出口改成 MediaStream → <audio>，下次 play() 生效 */
+  setMediaElementOutput(on: boolean): void {
+    this.useElement = on
+    if (!on && this.outEl) {
+      this.outEl.pause()
+      this.outEl.srcObject = null
+    }
+  }
+
   // ───────────────────────── 会话
 
   /** 新会话：新种子，从 0 秒开始。SessionView 挂载 / 再来一次时调用。疏密开始前定，播放中不改 */
@@ -140,7 +152,15 @@ export class SampleEngine {
     if (!this.plan) this.plan = planSession(this.seed, this.durationSec, presetFor(this.mode, this.density), M)
     if (this.offset >= this.plan.dur - 0.5) this.offset = 0
 
-    const g = this.buildGraph(ctx, ctx.destination)
+    let dest: AudioNode = ctx.destination
+    if (this.useElement) {
+      this.streamDest ??= ctx.createMediaStreamDestination()
+      this.outEl ??= new Audio()
+      this.outEl.srcObject = this.streamDest.stream
+      await this.outEl.play()
+      dest = this.streamDest
+    }
+    const g = this.buildGraph(ctx, dest)
     this.graph = g
     const now = ctx.currentTime + 0.12
     this.t0 = now - this.offset
