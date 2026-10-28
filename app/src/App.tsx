@@ -8,6 +8,7 @@ import type { Density } from './audio/engine'
 import type { Mode } from './types'
 import { loadPreferences, resetPreferences, savePreferences } from './storage/preferenceStore'
 import heroImage from './assets/zen-bamboo-stream.jpg'
+import heroImageAvif from './assets/zen-bamboo-stream.avif'
 import './App.css'
 import { DiagnosticsPanel } from './components/DiagnosticsPanel'
 import { SoundCredits } from './components/SoundCredits'
@@ -42,7 +43,11 @@ function App() {
         />
       ) : (
         <main className="home-view">
-          <img className="home-landscape" src={heroImage} alt="" aria-hidden="true" />
+          <picture className="home-landscape-frame" aria-hidden="true">
+            <source srcSet={heroImageAvif} type="image/avif" />
+            <img className="home-landscape" src={heroImage} alt="" />
+          </picture>
+          <div className="grain" aria-hidden="true" />
           <div className="home-veil" aria-hidden="true" />
 
           <header className="home-header">

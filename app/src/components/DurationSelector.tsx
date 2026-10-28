@@ -43,7 +43,7 @@ export function DurationSelector({ value, onChange }: DurationSelectorProps) {
             aria-checked={value === duration}
             aria-label={`${duration} 分钟`}
           >
-            {duration}
+            <span className="duration-value">{duration}</span>
           </button>
         ))}
         {customMode ? (
@@ -79,7 +79,7 @@ export function DurationSelector({ value, onChange }: DurationSelectorProps) {
             aria-checked={!isPreset}
             aria-label={!isPreset ? `自定义 ${value} 分钟` : '自定义时长'}
           >
-            {!isPreset ? value : '自定'}
+            <span className="duration-value">{!isPreset ? value : '自定'}</span>
           </button>
         )}
       </div>

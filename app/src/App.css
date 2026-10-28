@@ -19,13 +19,20 @@
   overflow: hidden;
 }
 
+.home-landscape-frame,
 .home-landscape,
-.home-veil {
+.home-veil,
+.grain {
   position: fixed;
   inset: 0;
   width: 100%;
   height: 100%;
   pointer-events: none;
+}
+
+.home-landscape-frame {
+  z-index: -3;
+  display: block;
 }
 
 .home-landscape {
@@ -39,8 +46,18 @@
 .home-veil {
   z-index: -2;
   background:
-    linear-gradient(90deg, rgba(8, 13, 10, 0.58) 0%, rgba(8, 13, 10, 0.34) 31%, rgba(8, 13, 10, 0.68) 49%, rgba(12, 17, 14, 0.95) 64%, #0c110e 100%),
-    linear-gradient(0deg, rgba(7, 11, 9, 0.74) 0%, transparent 45%, rgba(7, 11, 9, 0.24) 100%);
+    /* 墨从右侧慢慢洇开：过渡拉长到 40% 屏宽，最暗处也透一点景 */
+    linear-gradient(90deg, rgba(10, 15, 12, 0.6) 0%, rgba(10, 15, 12, 0.38) 26%, rgba(11, 16, 13, 0.56) 44%, rgba(12, 17, 14, 0.78) 62%, rgba(12, 17, 14, 0.88) 84%, rgba(12, 17, 14, 0.9) 100%),
+    linear-gradient(0deg, rgba(7, 11, 9, 0.7) 0%, transparent 45%, rgba(7, 11, 9, 0.26) 100%);
+}
+
+/* 极淡噪点：打散暗部色带，也给画面一点纸感 */
+.grain {
+  z-index: -1;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .93 0 0 0 0 .91 0 0 0 0 .86 0 0 0 1 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 160px 160px;
+  mix-blend-mode: soft-light;
 }
 
 .home-header,
@@ -74,8 +91,8 @@
   padding-left: 17px;
   border-left: 1px solid var(--border);
   color: var(--text);
-  font-size: 9px;
-  letter-spacing: 0.24em;
+  font-size: 10px;
+  letter-spacing: 0.22em;
 }
 
 .header-note {
@@ -89,6 +106,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(340px, 410px);
   align-items: center;
+  align-content: center;
   gap: clamp(64px, 9vw, 144px);
   flex: 1;
   padding: 48px 0 36px;
@@ -149,10 +167,11 @@
 
 .selector-heading h2 {
   margin: 0;
-  color: var(--text-h);
+  color: var(--text);
+  font-family: var(--font-display);
   font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 0.14em;
+  font-weight: 400;
+  letter-spacing: 0.18em;
 }
 
 .selector-note {
@@ -183,7 +202,7 @@
   color: var(--text);
   background: transparent;
   cursor: pointer;
-  transition: color 240ms var(--ease-quiet), background 240ms var(--ease-quiet);
+  transition: color 700ms var(--ease-quiet);
 }
 
 .option-card {
@@ -193,15 +212,6 @@
   gap: 9px;
   min-height: 52px;
   padding: 8px 4px 15px;
-}
-
-.option-mark {
-  width: 5px;
-  height: 5px;
-  border: 1px solid currentColor;
-  border-radius: 50%;
-  opacity: 0.5;
-  transition: opacity 240ms ease, background 240ms ease;
 }
 
 .option-label {
@@ -220,20 +230,19 @@
   color: var(--accent);
 }
 
-.option-card.is-selected .option-mark {
-  border-color: var(--accent);
-  background: var(--accent);
-  opacity: 1;
+.option-label,
+.duration-value {
+  position: relative;
 }
 
-.option-card.is-selected::after,
-.duration-pill.is-selected::after {
+.option-card.is-selected .option-label::after,
+.duration-pill.is-selected .duration-value::after {
   content: "";
   position: absolute;
-  right: 16%;
-  bottom: -1px;
-  left: 16%;
-  height: 2px;
+  right: 0;
+  bottom: -9px;
+  left: 0.12em;
+  height: 1px;
   background: var(--accent);
 }
 
@@ -261,35 +270,45 @@
   align-items: center;
   justify-content: center;
   min-width: 0;
-  min-height: 48px;
-  padding: 4px;
-  font-size: 16px;
+  min-height: 52px;
+  padding: 8px 4px 15px;
+  font-family: var(--font-display);
+  font-size: 18px;
   font-variant-numeric: tabular-nums;
   font-weight: 400;
 }
 
 .duration-pill--custom {
-  font-size: 12px;
-  letter-spacing: 0.08em;
+  font-size: 15px;
+  letter-spacing: 0.06em;
 }
 
 .custom-duration-form {
   display: flex;
-  gap: 2px;
+  align-items: baseline;
+  justify-content: center;
+  gap: 10px;
   width: 100%;
 }
 
 .custom-duration-input {
-  width: 100%;
+  width: 3.4em;
   min-width: 0;
-  padding: 0;
+  padding: 0 0 7px;
   border: 0;
+  border-bottom: 1px solid var(--accent-border);
   outline: 0;
   color: var(--text-h);
   background: transparent;
-  font-size: 12px;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
   text-align: center;
   appearance: textfield;
+}
+
+.custom-duration-input:focus {
+  border-bottom-color: var(--accent);
 }
 
 .custom-duration-input::-webkit-inner-spin-button,
@@ -299,18 +318,27 @@
 
 .custom-duration-input::placeholder {
   color: var(--text);
-  opacity: 0.65;
+  font-size: 13px;
+  opacity: 0.55;
 }
 
 .custom-duration-submit {
   flex: none;
-  padding: 0 4px;
+  min-height: 32px;
+  padding: 0 2px;
   border: 0;
-  color: var(--accent);
+  color: var(--text);
   background: transparent;
-  font-size: 11px;
+  font-family: var(--font-display);
+  font-size: 13px;
+  letter-spacing: 0.1em;
   white-space: nowrap;
   cursor: pointer;
+  transition: color 700ms var(--ease-quiet);
+}
+
+.custom-duration-submit:hover {
+  color: var(--text-h);
 }
 
 .home-actions {
@@ -327,25 +355,27 @@
   width: 100%;
   min-height: 60px;
   padding: 0 21px;
-  border: 1px solid #d8d1bd;
+  border: 1px solid var(--accent-border);
   border-radius: 2px;
-  color: #182019;
-  background: #d8d1bd;
-  font-size: 15px;
-  letter-spacing: 0.12em;
+  color: var(--text-h);
+  background: rgba(200, 185, 145, 0.08);
+  font-family: var(--font-display);
+  font-size: 16px;
+  letter-spacing: 0.18em;
   cursor: pointer;
-  transition: background 260ms var(--ease-quiet), border-color 260ms var(--ease-quiet);
+  transition: background 800ms var(--ease-quiet), border-color 800ms var(--ease-quiet);
 }
 
 .start-button:hover {
-  border-color: #ebe4d1;
-  background: #ebe4d1;
+  border-color: var(--accent);
+  background: rgba(200, 185, 145, 0.14);
 }
 
 .start-meta {
-  font-size: 10px;
+  color: var(--accent);
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+  font-size: 11px;
   letter-spacing: 0.06em;
-  opacity: 0.65;
 }
 
 .reset-button {
@@ -357,7 +387,7 @@
   font-size: 11px;
   letter-spacing: 0.1em;
   cursor: pointer;
-  transition: color 200ms ease;
+  transition: color 700ms var(--ease-quiet);
 }
 
 .reset-button:hover {
@@ -373,7 +403,7 @@
   margin: 0;
   padding: 0;
   color: var(--text);
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.8;
 }
 
@@ -424,6 +454,7 @@
 .session-view::before {
   z-index: -2;
   background: var(--session-bg) center / cover no-repeat;
+  background-image: var(--session-bg-set, var(--session-bg));
   filter: brightness(0.62) saturate(0.58);
   opacity: 1;
   transform: scale(1.02);
@@ -451,7 +482,12 @@
   pointer-events: none;
 }
 
-.session-view > :not(.particle-canvas) {
+.session-view > .grain {
+  position: fixed;
+  z-index: 0;
+}
+
+.session-view > :not(.particle-canvas):not(.grain) {
   position: relative;
   z-index: 1;
 }
@@ -474,13 +510,13 @@
   font-size: 11px;
   letter-spacing: 0.1em;
   cursor: pointer;
-  transition: color 200ms ease;
+  transition: color 700ms var(--ease-quiet);
 }
 
 .session-return span {
   display: inline-block;
   margin-right: 8px;
-  transition: transform 240ms var(--ease-quiet);
+  transition: transform 700ms var(--ease-quiet);
 }
 
 .session-return:hover {
@@ -499,10 +535,30 @@
 }
 
 .session-phase {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
   justify-self: end;
   color: var(--accent);
-  font-size: 11px;
+  font-family: var(--font-display);
+  font-size: 12px;
   letter-spacing: 0.22em;
+}
+
+.session-phase-steps {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.session-phase-steps i {
+  width: 10px;
+  height: 1px;
+  background: var(--border);
+  transition: background 1.2s var(--ease-quiet);
+}
+
+.session-phase-steps i.is-now {
+  background: var(--accent);
 }
 
 .session-stage {
@@ -548,15 +604,20 @@
 }
 
 .orb-track {
-  stroke: rgba(238, 233, 220, 0.13);
+  stroke: rgba(238, 233, 220, 0.16);
   stroke-width: 0.8;
 }
 
 .orb-progress {
-  stroke: var(--accent);
-  stroke-width: 1.5;
+  stroke: rgba(200, 185, 145, 0.72);
+  stroke-width: 1.2;
   stroke-linecap: round;
   transition: stroke-dasharray 1s linear;
+}
+
+.orb-head {
+  fill: var(--accent);
+  transition: cx 1s linear, cy 1s linear;
 }
 
 .orb-breath {
@@ -591,21 +652,15 @@
   justify-content: center;
 }
 
-.countdown-label,
-.countdown-caption {
-  color: var(--text);
-  font-size: 10px;
-  letter-spacing: 0.24em;
-}
-
 .countdown {
-  margin: 12px 0 10px;
+  margin: 0;
   color: var(--text-h);
-  font-size: clamp(40px, 5vw, 54px);
-  font-variant-numeric: tabular-nums;
+  font-family: var(--font-display);
+  font-size: clamp(42px, 5vw, 56px);
+  font-variant-numeric: tabular-nums lining-nums;
   font-weight: 300;
   line-height: 1;
-  letter-spacing: 0.025em;
+  letter-spacing: 0.04em;
 }
 
 .session-copy {
@@ -640,13 +695,12 @@
   background: rgba(12, 17, 14, 0.24);
   backdrop-filter: blur(8px);
   cursor: pointer;
-  transition: color 260ms ease, background 260ms ease, border-color 260ms ease;
+  transition: color 800ms var(--ease-quiet), background 800ms var(--ease-quiet), border-color 800ms var(--ease-quiet);
 }
 
 .session-play-button:hover {
   border-color: var(--accent);
-  color: var(--bg);
-  background: var(--accent);
+  background: rgba(200, 185, 145, 0.12);
 }
 
 .session-play-button svg {
@@ -683,9 +737,9 @@
 }
 
 .primary-action {
-  border: 1px solid var(--accent);
-  color: var(--bg);
-  background: var(--accent);
+  border: 1px solid var(--accent-border);
+  color: var(--text-h);
+  background: rgba(200, 185, 145, 0.08);
 }
 
 .ghost-action {
@@ -705,9 +759,9 @@
 
 .zen-quote {
   margin: 0;
-  color: rgba(238, 233, 220, 0.5);
+  color: rgba(238, 233, 220, 0.64);
   font-family: var(--font-display);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.8;
   letter-spacing: 0.16em;
   transition: opacity 1.4s ease;
@@ -777,6 +831,7 @@ summary:focus-visible {
   .hero-copy br { display: none; }
   .selector-block { margin-bottom: 24px; }
   .option-label { font-size: 18px; }
+  .duration-pill { font-size: 17px; }
   .start-button { min-height: 58px; }
   .home-footer { padding-top: 4px; }
 
@@ -789,7 +844,8 @@ summary:focus-visible {
   .session-stage { padding: 20px 0 12px; }
   .session-title { margin-bottom: 22px; font-size: 17px; }
   .session-orb { width: min(265px, 69vw); }
-  .countdown { font-size: 41px; }
+  .countdown { font-size: 44px; }
+  .session-phase-steps { display: none; }
   .session-copy { margin-top: 22px; font-size: 11px; }
   .session-playback { margin-top: 20px; }
   .session-play-button { width: 58px; height: 58px; }

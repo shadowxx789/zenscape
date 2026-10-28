@@ -36,7 +36,6 @@ export function ModeSelector({ value, onChange }: ModeSelectorProps) {
             role="radio"
             aria-checked={value === mode}
           >
-            <span className="option-mark" aria-hidden="true" />
             <span className="option-label">{MODE_DETAILS[mode].label}</span>
           </button>
         ))}

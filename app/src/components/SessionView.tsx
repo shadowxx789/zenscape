@@ -6,8 +6,11 @@ import type { Mode } from '../types'
 import { engine as audioEngine, type Density } from '../audio/engine'
 import { ParticleCanvas } from './ParticleCanvas'
 import sessionImage from '../assets/zen-night-valley.jpg'
+import sessionImageAvif from '../assets/zen-night-valley.avif'
 
 const getRecentEvents = () => audioEngine.getRecentEvents()
+
+const PHASES: Phase[] = ['entering', 'settling', 'deep', 'returning']
 
 /** 画面光的亮度：疏暗一点、满亮一点，跟声音一致 */
 const DENSITY_LIGHT: Record<Density, number> = { sparse: 0.32, mid: 0.44, full: 0.56 }
@@ -126,8 +129,12 @@ export function SessionView({ mode, duration, density, onReturn }: SessionViewPr
     <main
       className={`session-view ${isPlaying ? 'is-playing' : ''} ${hasStarted ? 'has-started' : ''} ${isFinished ? 'is-finished' : ''}`}
       aria-label="声景会话"
-      style={{ '--session-bg': `url(${sessionImage})` } as React.CSSProperties}
+      style={{
+        '--session-bg': `url(${sessionImage})`,
+        '--session-bg-set': `image-set(url(${sessionImageAvif}) type("image/avif"), url(${sessionImage}) type("image/jpeg"))`,
+      } as React.CSSProperties}
     >
+      <div className="grain" aria-hidden="true" />
       <ParticleCanvas
         isPlaying={isPlaying}
         brightness={DENSITY_LIGHT[density]}
@@ -140,7 +147,14 @@ export function SessionView({ mode, duration, density, onReturn }: SessionViewPr
           <span aria-hidden="true">←</span> 离开声景
         </button>
         <span className="session-wordmark">竹间息</span>
-        <span className="session-phase">{isFinished ? '圆满' : phaseLabel[currentPhase]}</span>
+        <span className="session-phase" aria-label={`当前阶段：${isFinished ? '圆满' : phaseLabel[currentPhase]}`}>
+          <span className="session-phase-steps" aria-hidden="true">
+            {PHASES.map((p) => (
+              <i key={p} className={p === currentPhase || (isFinished && p === 'returning') ? 'is-now' : ''} />
+            ))}
+          </span>
+          {isFinished ? '圆满' : phaseLabel[currentPhase]}
+        </span>
       </header>
 
       <section className="session-stage" aria-labelledby="session-title">
@@ -164,13 +178,19 @@ export function SessionView({ mode, duration, density, onReturn }: SessionViewPr
               transform="rotate(-90 92 92)"
             />
             <circle className="orb-breath" cx="92" cy="92" r="62" fill="none" />
+            {progress > 0 && (
+              <circle
+                className="orb-head"
+                cx={92 + 88 * Math.cos(progress * 2 * Math.PI - Math.PI / 2)}
+                cy={92 + 88 * Math.sin(progress * 2 * Math.PI - Math.PI / 2)}
+                r="2.4"
+              />
+            )}
           </svg>
           <div className="orb-inner">
-            <span className="countdown-label">{isFinished ? '声景已止' : isPlaying ? '此刻' : '准备'}</span>
             <div className="countdown" role="timer" aria-label={`剩余时间 ${formatTime(remaining)}`}>
               {formatTime(remaining)}
             </div>
-            <span className="countdown-caption">剩余时间</span>
           </div>
         </div>
 

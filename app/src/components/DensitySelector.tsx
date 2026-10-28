@@ -22,7 +22,6 @@ export function DensitySelector({ value, onChange }: DensitySelectorProps) {
             role="radio"
             aria-checked={value === d}
           >
-            <span className="option-mark" aria-hidden="true" />
             <span className="option-label">{DENSITY_DETAILS[d].label}</span>
           </button>
         ))}
