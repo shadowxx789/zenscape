@@ -1,5 +1,7 @@
 # BreezeScape Sprint 1 技术规格
 
+> **历史档案（2026-10-28 注）**：本 Sprint 的四个 Task 已实施并上线过，随后整条合成路线被 v2 真实录音引擎取代（`app/src/audio/v2/`）。v1 代码仍在 `app/src/audio/AudioEngine.ts` 等文件中，在线地址加 `?engine=v1` 可回听。文中「索尼 1000XM5」的听感标准已作废，现以手机外放为准。
+
 > **让声音对得起耳机**
 > Version 1.0 · 2026-05-17 · 目标受众：Codex / 自己 / 任何接手代码的人
 

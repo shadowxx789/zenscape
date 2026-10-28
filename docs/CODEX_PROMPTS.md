@@ -1,5 +1,7 @@
 # BreezeScape Sprint 1 — Codex Prompt 集合
 
+> **历史档案（2026-10-28 注）**：配合已完成并被取代的 Sprint 1（v1 合成引擎）。文中的文件路径与参数针对 v1，不适用于现行的 v2 引擎。
+
 > **开箱即用的提示词**
 > Version 1.0 · 2026-05-17 · 配合 `docs/SPRINT_1_SPEC.md` 使用
 

@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Live Demo](https://img.shields.io/badge/demo-online-brightgreen)](https://shadowxx789.github.io/zenscape/)
 [![Tech](https://img.shields.io/badge/React-19-61DAFB?logo=react)](https://react.dev/)
-[![Tech](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript)](https://www.typescriptlang.org/)
+[![Tech](https://img.shields.io/badge/TypeScript-6-3178C6?logo=typescript)](https://www.typescriptlang.org/)
 [![Tech](https://img.shields.io/badge/Web%20Audio%20API-native-FF6F00)](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API)
 
 ## 偈
@@ -19,133 +19,144 @@
 
 ---
 
-## 📐 项目导航
-
-| 文档 | 用途 |
-|---|---|
-| 🗺️ [docs/ROADMAP.md](docs/ROADMAP.md) | 开发战略总览（6 个 Sprint） |
-| 🔧 [docs/SPRINT_1_SPEC.md](docs/SPRINT_1_SPEC.md) | Sprint 1 施工图（声音质量升级） |
-| 🤖 [docs/CODEX_PROMPTS.md](docs/CODEX_PROMPTS.md) | Codex 开箱即用提示词集合 |
-| 📜 [APP_SPEC.md](APP_SPEC.md) | MVP 规格（历史档案） |
-| 🔊 [SOUND_SPEC.md](SOUND_SPEC.md) | 声音规格（历史档案） |
-| ✅ [TASKS.md](TASKS.md) | M0-M7 任务（已完成） |
-| 🎧 [CREDITS.md](CREDITS.md) | 声音素材来源与授权（v2 引擎） |
-
----
-
 ## 什么是竹间息
 
-竹间息是一个生成式冥想声景应用。不是播放列表，不是白噪声合集——它在你的浏览器里实时合成一片永远不会重复的声音空间：风过竹林、水流溪涧、远处的钟、偶尔的古琴泛音。五层声音各自呼吸、各自生长，像一座会变化的山。
+竹间息是一个生成式冥想声景应用。不是播放列表，不是白噪声合集：竹叶、微风、山涧、远寺的钟、偶尔一声古琴，都是真实录音；但什么时候响、从哪边来、多大声，每一次都由程序重新编排。同一段声景不会出现第二次。
 
-你不需要做任何事。选一个模式，选一个时长，闭上眼睛。
+你不需要做任何事。选一个模式、一段时长、几分声音，闭上眼睛。
 
 声音会自己走。
 
-**→ [在线体验](https://shadowxx789.github.io/zenscape/)**
+**→ [在线体验](https://shadowxx789.github.io/zenscape/)**（手机外放即可，不必戴耳机）
 
 ---
 
-## 三个模式
+## 开始前只选三件事
 
-每个模式有独立的声景预设（音量、滤波、声像、音阶、事件密度全部独立调校）：
+| 选择 | 选项 |
+|---|---|
+| 此刻，想要 | 静坐 · 入睡 · 专注 |
+| 留多久 | 5 · 10 · 20 · 30 分钟，或自定 1–180 分钟 |
+| 声音几分 | 疏 · 中 · 满 |
 
-| 模式 | 意图 |
-|------|------|
-| 静坐 | 松沉、内观。声音从四周慢慢收拢，密度渐低，留白渐多。C 宫五声。 |
-| 入睡 | 暗色、包裹。低频为主，钟声极远，像雨落在很远的地方。G 宫五声。 |
-| 专注 | 清醒但不紧绷。持续的环境底噪维持注意力，偶有亮色点缀。D 宫五声。 |
+没有滑杆。声音的平衡是一轮轮试听调出来的，交给用户细调只会把它调坏；在手机外放上，多数细调也听不出区别。所以只留一个开关：开始前选疏密，播放中不改。
+
+- **疏 · 大段留白**：风常歇、歇得更深，风歇里常有几秒深静；古琴很少，只单音。
+- **中 · 风静各半**：琴声隔一会儿来一句。这一档是反复试听定稿的基准。
+- **满 · 声音常在**：风只是轻一点、不停，水几乎不退；琴句更勤，常两三声成句。
+
+> 入睡、专注两个模式目前沿用静坐的声音，只做了推断性调整（入睡琴更稀、钟更疏；专注水声稍亮），还没有经过试听定稿。
 
 ---
 
 ## 声音设计
 
-五层声音，不是音轨，是活的参数流：
+### 程序只决定「何时、何处、多大」
 
-- **风** — 竹林风声，长循环，是整片声景的呼吸
-- **水** — 溪流细雨，轻而持续，不抢注意力
-- **低频** — 合成的持续低音，温和，无压迫感。非线性增益曲线，滑杆拉到底仍有底声托住空间
-- **钟** — 远寺钟声，极稀疏，像从山那边飘过来的
-- **古琴** — 泛音单音，偶尔一响，不形成旋律。基于五声音阶（C/D/G 宫可选）
+每次进入声景，引擎用一个随机种子写出整段会话的「乐谱」（`app/src/audio/v2/plan.ts`，纯函数，同一种子可复现）：
 
-每个声音层的音量、频率、空间位置都由规则引擎实时驱动，跟随会话阶段（入定 → 安住 → 深境 → 回转）缓慢变化。钟声和古琴由概率触发——你永远不知道下一响是什么时候。
+- **底层呼吸**：竹叶和微风在吹过与安静之间慢慢呼吸；风歇时水也退下去，但不退成真空，只剩隐约的风和水。
+- **深静**：少数几处 5–8 秒的深度寂静，避开钟和琴的尾音。
+- **钟**：约三分钟一次，远、沉，像从山那边传来；会话最后一声总是钟，尾音散尽才停。
+- **古琴**：一个小音池，大多单音；成句时有「记忆」——动机会被再现、倒影、截短或平移，但不连弹同一音，也不形成旋律。
+- **风回来不涌**：风从静处回来有限速；每一阵风拉平到同一响度，长静之后的那一阵再轻一点。
 
-每个模式有独立的 `EnginePreset`（风/水/Drone 增益、滤波、声像、混响比例）+ `SchedulerParams`（事件密度、最小间隔、首次延迟）+ `SoundParams`（五维滑杆），三层预设协同工作。
+乐谱写好后要过一组门槛：钟和琴必须听得见、深静足够、底层不突跳。不过就换一个派生种子重写，最多 16 次。
 
-### 混响
+### 声音来自真实录音
 
-卷积混响，脉冲响应不是从库里拿的——是手写的山间模型：6 秒衰减、80ms 预延迟、低频更暗、带早期反射。三个模式的混响湿度各不相同（静坐 45%、入睡 65%、专注 25%），事件通道（钟/琴）的发送量高于环境层。
+竹叶、微风、山涧、东京增上寺的钟、一段古琴录音，全部来自 Freesound 的 CC0 / CC BY 素材，经过剪辑、滤波、混响与包络处理。来源与授权见 [CREDITS.md](CREDITS.md)，首页底部「声音来源」也能看到。
 
-信号链现在是并行的：环境层和事件层各走一条 dry bus 进 master，同时通过独立的 send 节点送进同一个 convolver 再汇回 master，进 limiter 后才到淡入总线。不爆音，不打架。
+### 空间
 
-空间感滑杆统一控制声像与混响湿度——切换模式时 pan 和 reverb 不再各走各的，不会出现短暂不一致。
+一条大空间卷积混响托住竹林（真立体声）。钟和古琴另走「远处」：先过一道空气低通，再加长预延迟和长尾，像隔着雾传过来，而不是贴在耳边。
+
+### 以手机外放为准
+
+主要的收听场景是夜里、手机外放。所有听感验收都在手机外放模拟（高通 300 Hz + 低通 9 kHz）下做，而不是在耳机上。
+
+---
+
+## 界面
+
+墨、雾、留白；景退，声前。
+
+- 首页：竹林在左，墨色从右侧慢慢洇开；竹影极轻地摇。
+- 计时页：一只细圆环、一个数字。圆环约 10 秒呼吸一次，可以跟着它呼吸；按下播放，背景退到一半。
+- 九秒不碰屏幕，文字全部隐去，只留一环一数；碰一下再浮现。
+- 结束前约 20 秒，画面随最后一声钟一起暗下去；离开时声音和画面一起淡出。
+- 钟响时圆环外散开一圈极淡的金线，古琴在圆环上亮起一小段弧；两侧各有一颗很慢的光斑。
+- 支持系统的「减少动态效果」：开启后不摇、不呼吸、不过渡。
 
 ---
 
 ## 功能
 
-- **实时合成** — 全部声音由 Web Audio API 合成，无音频文件依赖
-- **三层混音** — 风声、水声、Drone 三层独立控制
-- **卷积混响** — 手写山间 IR，并行干/湿总线架构
-- **动态压缩** — 总线 limiter 防爆音，-6dB 阈值 / 8:1
-- **五维调节** — 主音量 / 自然声 / 乐器 / 空间感 / 明亮度
-- **概率事件** — 钟声、古琴随机触发，不循环、不重复
-- **阶段规则** — 四个会话阶段自动调整参数（入定 → 安住 → 深境 → 回转）
-- **粒子艺术** — 播放时温暖的数字粒子缓慢流动
-- **偏好持久** — 模式、时长、滑杆值自动保存到本地
-- **自定义时长** — 5 / 10 / 20 / 30 分钟或自定义
-
----
-
-## 🚧 路线图
-
-BreezeScape MVP（M0-M7）已完成。后续开发遵循 6 个 Sprint：
-
-| Sprint | 主题 | 状态 |
-|---|---|---|
-| **1** | 让声音对得起耳机（粉红噪声 / 非谐钟 / Karplus 古琴 / 卷积混响） | 🟢 卷积混响 ✅ / 其余进行中 |
-| **2** | Endel 化响应式输入（时辰 / 节气 / 天气 / 设备运动 / 麦克风） | 📋 规划中 |
-| **3** | 禅式扩展（行禅 / 茶时 / 观息 / 木鱼 / 风铃 / 泉滴） | 📋 规划中 |
-| **4** | 生成叙事（入山 → 见雾 → 听涧 → 安住 → 闻钟 → 归途） | 📋 规划中 |
-| **5** | 个性化学习（听感校准 + 偏好 Bandit） | 📋 规划中 |
-| **6** | UI 打磨（完成页 / 呼吸圆 / 移动端） | 📋 规划中 |
-
-详细规划见 [docs/ROADMAP.md](docs/ROADMAP.md)。
+- **真实录音 + 生成式乐谱**：按种子编排，不重复
+- **三模式 × 三档疏密 × 任意时长**（1–180 分钟）
+- **会话四段**：渐入 → 安住 → 深境 → 回转，计时页右上角有四格进度
+- **离线可用**：PWA，可添加到主屏幕，素材全部预缓存
+- **本地偏好**：模式、时长、疏密保存在浏览器里
+- **无账号、无后端、无追踪**
 
 ---
 
 ## 🏗️ 设计纲领
 
-BreezeScape 的底层公理是 **Endel 三公理 ⊕ 禅声三公理**：
+**禅声三公理**：
 
-**响应式（来自 Endel）**：
-1. 声景 = 实时输入函数，不是预录素材
-2. 每个声景对应明确的功能态（Flow / Circadian / 副交感）
-3. "无重复"来自参数流的连续变化
-
-**禅意（BreezeScape 的差异化）**：
-1. 声音必须服务于"不注意声音"
+1. 声音必须服务于「不注意声音」。越被注意越是失败
 2. 留白是材料，不是 bug
 3. 声音是无常的隐喻：升起 → 安住 → 消散
 
 > Endel 帮你完成任务，**竹间息帮你忘掉任务**。
 
-详见 [docs/ROADMAP.md](docs/ROADMAP.md) 第 2 节。
+不做 streak，不做 minutes this week，不做 achievement。
+
+---
+
+## 进展
+
+| 阶段 | 内容 | 状态 |
+|---|---|---|
+| M0–M7 | MVP：合成引擎、五层声音、调度器、阶段规则、偏好、粒子、部署 | ✅ 2026-05 |
+| Sprint 1 | 让合成声音更真：粉红噪声、非谐钟、Karplus 古琴、卷积混响 | ✅ 完成后被 v2 取代 |
+| v2 引擎 | 换成真实录音 + 种子乐谱；在手机外放下逐轮试听定稿 | ✅ 2026-10 |
+| 疏 · 中 · 满 | 五个滑杆退场，换成开始前选的三档疏密 | ✅ 2026-10 |
+| 界面重做 | 墨、雾、留白；呼吸圆环、无操作隐去、慢淡入淡出 | ✅ 2026-10 |
+| 入睡 / 专注 | 两个模式的声音出试听、定稿 | 📋 下一步 |
+| 真机验证 | iPhone 锁屏后是否继续发声 | 📋 待验 |
+| Sprint 2–5 | 响应式输入、禅式扩展、生成叙事、个性化 | 💤 搁置 |
+
+在线地址后加 `?engine=v1` 可以回到 MVP 时期的合成引擎，作对比用。
+
+---
+
+## 📐 文档
+
+| 文档 | 内容 |
+|---|---|
+| 🎧 [CREDITS.md](CREDITS.md) | 声音素材来源与授权 |
+| 🗺️ [docs/ROADMAP.md](docs/ROADMAP.md) | 2026-05 的六个 Sprint 规划（顶部有现状说明） |
+| 🔧 [docs/SPRINT_1_SPEC.md](docs/SPRINT_1_SPEC.md) | Sprint 1 施工图：合成声音升级（历史档案） |
+| 🤖 [docs/CODEX_PROMPTS.md](docs/CODEX_PROMPTS.md) | Sprint 1 的 Codex 提示词（历史档案） |
+| 📏 [docs/AUDIO_BASELINE.md](docs/AUDIO_BASELINE.md) · [docs/PHASE1_EXPERIMENT.md](docs/PHASE1_EXPERIMENT.md) | v1 合成引擎的电平测量（历史档案） |
+| 📜 [APP_SPEC.md](APP_SPEC.md) · 🔊 [SOUND_SPEC.md](SOUND_SPEC.md) · ✅ [TASKS.md](TASKS.md) | MVP 规格与 M0–M7 任务（历史档案） |
 
 ---
 
 ## 技术栈
 
 ```
-React 19 + TypeScript
+React 19 + TypeScript 6
 Vite 8
-Web Audio API
-Canvas 2D (粒子)
+Web Audio API（AudioBufferSource · ConvolverNode · OfflineAudioContext）
+Canvas 2D（光斑与涟漪）
+vitest（乐谱门槛测试）
+PWA（vite-plugin-pwa + Workbox）
 localStorage
-PWA (vite-plugin-pwa + Workbox)
-无后端，无账号，无依赖
+无后端、无账号；运行时只依赖 React
 ```
-
-支持 PWA：可"添加到主屏幕"以独立 App 模式运行，离线可用。纯静态部署。
 
 ---
 
@@ -153,38 +164,31 @@ PWA (vite-plugin-pwa + Workbox)
 
 ```
 zenscape/
-  README.md              ← 你在这里
-  APP_SPEC.md            ← MVP 历史档案
-  SOUND_SPEC.md          ← 声音规格历史档案
-  TASKS.md               ← M0-M7 任务清单（已完成）
-  docs/
-    ROADMAP.md           ← 战略：6 个 Sprint 总览
-    SPRINT_1_SPEC.md     ← 战术：Sprint 1 施工图
-    CODEX_PROMPTS.md     ← 执行：Codex 提示词集
-    assets/
-      signal-chain.png   ← Sprint 1 信号链架构图
-      roadmap.png        ← 6 Sprint 路线图
+  README.md               ← 你在这里
+  CREDITS.md              ← 声音素材来源与授权
+  APP_SPEC.md · SOUND_SPEC.md · TASKS.md   ← MVP 历史档案
+  docs/                   ← 路线图、Sprint 1、v1 电平测量（历史档案）
   app/
+    public/audio/v2/      ← 导出的录音素材 + soundscape.json（含署名）
     src/
       audio/
-        AudioEngine.ts   ← 音频引擎（风/水/Drone 三层 + 卷积混响 + limiter + 并行总线）
-        OneShotPlayer.ts ← 钟声/古琴合成（五声音阶，路由至事件总线）
-        scheduler.ts     ← 概率触发调度器（密度门控 + 最小间隔）
-        rules.ts         ← 会话阶段规则引擎
-        soundParams.ts   ← 声音参数类型
-        soundscapes.ts   ← 模式预设（含独立 reverbWet 配置）
+        engine.ts         ← 选择发声引擎（默认 v2，?engine=v1 回到合成版）
+        v2/
+          plan.ts         ← 会话乐谱：风歇、深静、钟、古琴的时刻与电平
+          plan.test.ts    ← 乐谱门槛测试（三档 × 多种时长 × 多种子）
+          preset.ts       ← 模式预设 + 疏 / 中 / 满
+          composer.ts     ← 古琴作曲：有记忆的随机
+          space.ts        ← 大空间 / 远处空间的脉冲响应
+          SampleEngine.ts ← 播放与离线渲染
+          rng.ts          ← 可复现的随机数
+        AudioEngine.ts …  ← v1 合成引擎（保留作对比）
       components/
-        ParticleCanvas.tsx
-        SessionView.tsx
-        ModeSelector.tsx
-        DurationSelector.tsx
-        SoundControls.tsx
-      storage/
-        preferenceStore.ts
-      App.tsx
-      App.css
-    public/
-      favicon.svg
+        SessionView.tsx   ← 计时页：圆环、阶段、无操作隐去、结束淡出
+        ParticleCanvas.tsx← 光斑与涟漪
+        ModeSelector · DurationSelector · DensitySelector
+        SoundCredits.tsx  ← 首页「声音来源」
+      storage/preferenceStore.ts
+      App.tsx · App.css · index.css
 ```
 
 ---
@@ -192,9 +196,9 @@ zenscape/
 ## 设计原则
 
 - **留白。** 声音之间的沉默是设计的一部分，不是 bug。
-- **不循环。** 规则引擎驱动参数流，同一段声景不会重复出现。
-- **不突然。** 所有音量、滤波、空间变化必须渐变（ramp），不允许爆音。
-- **不打扰。** 钟声不提示，古琴不旋律化，一切声音服务于"不注意声音"。
+- **不循环。** 每次会话重新编排，同一段声景不会重复出现。
+- **不突然。** 所有音量、滤波、空间变化必须渐变；风回来也要限速。
+- **不打扰。** 钟声不提示，古琴不旋律化，一切声音服务于「不注意声音」。
 - **不功用。** 不要 streak，不要 minutes this week，不要 achievement。
 - **本地优先。** 无账号、无后端、无上传，所有数据留在浏览器。
 - **浏览器即道场。** 无需安装，点击即用，AudioContext 在用户手势后才激活。
@@ -206,52 +210,31 @@ zenscape/
 ```bash
 cd app
 npm install
-npm run dev
+npm run dev        # 本地开发
+npm test           # 乐谱门槛测试
+npm run build      # 产物在 app/dist/
 ```
 
 ## 部署
 
-```bash
-cd app
-npm run build
-# dist/ 目录可部署到任意静态托管
-```
+合进 `main` 不会自动上线。站点由 `gh-pages` 分支提供：构建后用 `app/dist/` 的内容替换 `gh-pages` 根目录的构建产物（保留 `sprint-1.5/` 与 `.nojekyll`），推送即可。
 
-已部署到 GitHub Pages：[shadowxx789.github.io/zenscape](https://shadowxx789.github.io/zenscape/)
-
----
-
-## 里程碑（已完成）
-
-| 阶段 | 内容 | 状态 |
-|------|------|------|
-| M0 | 项目搭建、静态 UI、倒计时 | ✅ |
-| M1 | AudioEngine 风声合成 | ✅ |
-| M2 | 多层混音 + 滑杆 + 自定义时长 | ✅ |
-| M3 | 钟声/古琴概率触发 | ✅ |
-| M4 | 会话阶段规则引擎 | ✅ |
-| M5 | 本地偏好持久化 | ✅ |
-| M6 | 禅意粒子艺术 | ✅ |
-| M7 | 测试 + 部署 | ✅ |
-
-后续 Sprint 进展见 [docs/ROADMAP.md](docs/ROADMAP.md)。
+已部署：[shadowxx789.github.io/zenscape](https://shadowxx789.github.io/zenscape/)。手机若打开过旧版，PWA 缓存可能要关掉页面重开一两次才会更新。
 
 ---
 
 ## 🤝 贡献
 
-本项目目前由 [@shadowxx789](https://github.com/shadowxx789) 主导开发，借助 Codex 协作。
+本项目由 [@shadowxx789](https://github.com/shadowxx789) 主导开发，借助 AI 协作。
 
-如果你想：
-- **听听声音** → 直接打开 [在线 demo](https://shadowxx789.github.io/zenscape/)
+- **听听声音** → 打开 [在线 demo](https://shadowxx789.github.io/zenscape/)
 - **提建议** → 开 Issue
-- **改代码** → 看 [docs/ROADMAP.md](docs/ROADMAP.md) 找到你想做的 Sprint，再看对应 spec
 
 ---
 
 ## 开源协议
 
-MIT License — 自由使用，自由修改，自由分发。
+代码：MIT License。声音素材各自遵循其授权（CC0 / CC BY 4.0），见 [CREDITS.md](CREDITS.md)。
 
 ---
 

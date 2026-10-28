@@ -1,5 +1,7 @@
 # Audio Baseline — 修复前基线
 
+> **历史档案（2026-10-28 注）**：测量对象是 v1 合成引擎（`audioEngine.diagnostics`）。现行 v2 引擎的电平以手机外放模拟下的乐谱门槛为准，见 `app/src/audio/v2/plan.test.ts`。
+
 **测量日期**: 2026-05-25
 **项目 commit**: ab0eb27
 **测试设备**: Apple MacBook Pro M-series (Headless Chrome 148.x)
