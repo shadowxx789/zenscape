@@ -21,7 +21,7 @@ import type { SchedulerParams } from '../scheduler'
 import { getModePreset } from '../soundscapes'
 import type { Mode } from '../../types'
 import { planSession, type Layer, type SessionPlan, type SoundscapeManifest, type TextureSegment, type QinNote, type BellStrike } from './plan'
-import { V2_PRESETS } from './preset'
+import { presetFor, type Density } from './preset'
 import { newSeed } from './rng'
 import { buildSpaceIR } from './space'
 
@@ -66,6 +66,7 @@ export class SampleEngine {
   private plan: SessionPlan | null = null
 
   private mode: Mode = 'meditate'
+  private density: Density = 'mid'
   private durationSec = 600
   private seed = newSeed()
   private offset = 0 // 会话内已播放的秒数（暂停时记住）
@@ -106,10 +107,11 @@ export class SampleEngine {
 
   // ───────────────────────── 会话
 
-  /** 新会话：新种子，从 0 秒开始。SessionView 挂载 / 再来一次时调用 */
-  prepareSession(mode: Mode, durationSec: number, seed = newSeed()): void {
+  /** 新会话：新种子，从 0 秒开始。SessionView 挂载 / 再来一次时调用。疏密开始前定，播放中不改 */
+  prepareSession(mode: Mode, durationSec: number, density: Density = 'mid', seed = newSeed()): void {
     this.stopImmediate()
     this.mode = mode
+    this.density = density
     this.durationSec = durationSec
     this.seed = seed
     this.offset = 0
@@ -129,7 +131,7 @@ export class SampleEngine {
     this.stopImmediate()
     const ctx = this.ctx!
     const M = this.manifest!
-    if (!this.plan) this.plan = planSession(this.seed, this.durationSec, V2_PRESETS[this.mode], M)
+    if (!this.plan) this.plan = planSession(this.seed, this.durationSec, presetFor(this.mode, this.density), M)
     if (this.offset >= this.plan.dur - 0.5) this.offset = 0
 
     const g = this.buildGraph(ctx, ctx.destination)
@@ -267,15 +269,17 @@ export class SampleEngine {
     mode: Mode = 'meditate',
     sampleRate = 48000,
     layers: { bed?: boolean; events?: boolean } = {},
+    density: Density = 'mid',
   ): Promise<{ plan: SessionPlan; buffer: AudioBuffer }> {
     const M = await fetchManifest()
     const ctx = new OfflineAudioContext(2, Math.ceil(durSec * sampleRate), sampleRate)
     const buffers = await decodeAll(ctx, M)
-    const plan = planSession(seed, durSec, V2_PRESETS[mode], M)
-    const saved = { b: this.buffers, m: this.manifest, mode: this.mode }
+    const plan = planSession(seed, durSec, presetFor(mode, density), M)
+    const saved = { b: this.buffers, m: this.manifest, mode: this.mode, density: this.density }
     this.buffers = buffers
     this.manifest = M
     this.mode = mode
+    this.density = density
     const def = getModePreset(mode).sound
     const levels = { master: def.masterVolume, nature: def.natureLevel, inst: def.instrumentLevel, sp: def.spatialLevel, br: def.brightness }
     const keep = [this._masterVolume, this._natureLevel, this._instrumentLevel, this._spatialLevel, this._brightness] as const
@@ -296,6 +300,7 @@ export class SampleEngine {
       this.buffers = saved.b
       this.manifest = saved.m
       this.mode = saved.mode
+      this.density = saved.density
       ;[this._masterVolume, this._natureLevel, this._instrumentLevel, this._spatialLevel, this._brightness] = keep
     }
   }
@@ -539,7 +544,7 @@ export class SampleEngine {
   }
 
   private scheduleQin(ctx: BaseAudioContext, g: Graph, n: QinNote, when: number): void {
-    const P = V2_PRESETS[this.mode].qin.far
+    const P = presetFor(this.mode, this.density).qin.far
     const M = this.manifest!
     const src = ctx.createBufferSource()
     src.buffer = this.buffers!.qin[n.clip]
@@ -574,7 +579,7 @@ export class SampleEngine {
   }
 
   private scheduleBell(ctx: BaseAudioContext, g: Graph, b: BellStrike, when: number): void {
-    const P = V2_PRESETS[this.mode].bell.far
+    const P = presetFor(this.mode, this.density).bell.far
     const M = this.manifest!
     const src = ctx.createBufferSource()
     src.buffer = this.buffers!.bell

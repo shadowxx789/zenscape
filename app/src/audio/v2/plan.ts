@@ -195,7 +195,7 @@ function texture(
 // ───────────────────────── 种子筛选
 
 /** 乐谱层面的验收（模型估算，手机 dB）：够疏、几阵风一样大。返回不合格原因，空 = 合格 */
-export function planIssues(p: SessionPlan): string[] {
+export function planIssues(p: SessionPlan, quietMin = 135 / 295): string[] {
   const R = p.ctrlRate
   const a = 35
   const b = Math.max(a + 60, Math.floor(p.endBell) - 10)
@@ -209,7 +209,7 @@ export function planIssues(p: SessionPlan): string[] {
   const issues: string[] = []
   const quietFrac = e.filter((v) => v <= p90 - 10).length / e.length
   // 6 分钟定稿 C++6 实测 147/295 ≈ 0.50；模型比实测高约 10s，所以门槛按 135/295
-  if (quietFrac < 135 / 295) issues.push(`quiet ${(quietFrac * 100).toFixed(0)}%`)
+  if (quietFrac < quietMin) issues.push(`quiet ${(quietFrac * 100).toFixed(0)}%`)
   const runs: number[] = []
   let s0 = -1
   e.forEach((v, i) => {
@@ -234,7 +234,7 @@ export function planSession(seed: number, durSec: number, P: V2Preset, M: Sounds
     const s = k === 0 ? seed >>> 0 : (Math.imul(seed ^ 0x5bd1e995, k + 1) + k * 0x27d4eb2d) >>> 0
     const p = buildPlan(s, durSec, P, M)
     if (!first) first = p
-    if (planIssues(p).length === 0) return p
+    if (planIssues(p, P.quietMin).length === 0) return p
   }
   return first!
 }
@@ -526,7 +526,11 @@ export function buildPlan(seed: number, durSec: number, P: V2Preset, M: Soundsca
     cents: uniform(rEvent, -14, 14),
     lp: uniform(rFar, P.bell.far.lp[0], P.bell.far.lp[1]),
     rt60: uniform(rFar, P.bell.far.rt60[0], P.bell.far.rt60[1]),
-    gainDb: bedRefDb + P.bell.overBedDb + P.bell.far.headDb + uniform(rEvent, -1.5, 1.5) - F.bell.headDb,
+    gainDb:
+      Math.max(bedRefDb + P.bell.overBedDb, P.bell.overLocalMinDb === undefined ? -Infinity : localAt(at) + P.bell.overLocalMinDb) +
+      P.bell.far.headDb +
+      uniform(rEvent, -1.5, 1.5) -
+      F.bell.headDb,
     irSeed: Math.floor(rFar() * 2 ** 31),
     final: k === bellTimes.length - 1,
   }))

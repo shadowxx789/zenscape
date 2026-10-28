@@ -7,6 +7,9 @@ import type { AudioDiagnostics } from './AudioDiagnostics'
 import type { SchedulerParams } from './scheduler'
 import type { Mode } from '../types'
 import { sampleEngine } from './v2/SampleEngine'
+import type { Density } from './v2/preset'
+
+export type { Density }
 
 export interface Engine {
   readonly playing: boolean
@@ -15,7 +18,8 @@ export interface Engine {
   readonly eventsSolo: boolean
   /** true：阶段变化已写进乐谱，界面不要再按阶段改参数 */
   readonly ownsDynamics?: boolean
-  prepareSession?(mode: Mode, durationSec: number): void
+  /** density：疏 / 中 / 满，开始前选；缺省 = 中（定稿 C++6） */
+  prepareSession?(mode: Mode, durationSec: number, density?: Density): void
   play(): Promise<void>
   stop(): void
   stopImmediate(): void
