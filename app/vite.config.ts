@@ -39,7 +39,7 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,jpg,jpeg,woff,woff2}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,jpg,jpeg,avif,woff,woff2}'],
         // 不自动 skipWaiting，避免播放中页面被新 SW 接管
         skipWaiting: false,
         clientsClaim: false,
