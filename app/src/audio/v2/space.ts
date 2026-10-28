@@ -141,3 +141,61 @@ export function buildSpaceIR(
   }
   return ir
 }
+
+/**
+ * 同一条真立体声 IR，拆成「直通 + 交叉」两条，便宜一半。
+ *
+ * 4 声道 IR 里 LR/RL 只有两个翻转的早期反射（≤ 0.15s），却要按整条 IR 长度（数秒）做 FFT 卷积，
+ * 一半算力花在零上。拆开后：
+ *   - direct：2 声道 [LL, RR]，各声道自卷（Chrome/Safari 对 2 声道 IR + 2 声道输入就是这样处理的）
+ *   - cross ：2 声道 [LR, RL] 截到最后一个非零样本，输入左右互换后再卷
+ * outL = inL⊛LL + inR⊛RL，outR = inR⊛RR + inL⊛LR —— 和 4 声道 IR 数学上相同。
+ */
+export function splitTrueStereoIR(ctx: BaseAudioContext, ir: AudioBuffer): { direct: AudioBuffer; cross: AudioBuffer } {
+  if (ir.numberOfChannels !== 4) throw new Error('splitTrueStereoIR: need a 4-channel IR')
+  const sr = ir.sampleRate
+  const direct = ctx.createBuffer(2, ir.length, sr)
+  direct.copyToChannel(ir.getChannelData(0), 0)
+  direct.copyToChannel(ir.getChannelData(3), 1)
+  const LR = ir.getChannelData(1)
+  const RL = ir.getChannelData(2)
+  let last = 0
+  for (let i = ir.length - 1; i >= 0; i--) {
+    if (LR[i] !== 0 || RL[i] !== 0) {
+      last = i
+      break
+    }
+  }
+  const cross = ctx.createBuffer(2, Math.max(128, last + 1), sr)
+  // 输入已左右互换：通道 0 拿到的是 inR，要乘 RL 进 outL；通道 1 拿到 inL，乘 LR 进 outR
+  cross.copyToChannel(RL.subarray(0, cross.length), 0)
+  cross.copyToChannel(LR.subarray(0, cross.length), 1)
+  return { direct, cross }
+}
+
+/** 把 input 接进拆开的真立体声混响，结果汇到 output。返回新建的节点，便于事后断开 */
+export function connectTrueStereo(
+  ctx: BaseAudioContext,
+  input: AudioNode,
+  ir: AudioBuffer,
+  output: AudioNode,
+): AudioNode[] {
+  const { direct, cross } = splitTrueStereoIR(ctx, ir)
+  const d = ctx.createConvolver()
+  d.normalize = false
+  d.buffer = direct
+  const split = ctx.createChannelSplitter(2)
+  const merge = ctx.createChannelMerger(2)
+  const c = ctx.createConvolver()
+  c.normalize = false
+  c.buffer = cross
+  // 2 声道 IR 的卷积器默认 channelCountMode = clamped-max，单声道输入会被上混成 L=R，与 4 声道路径一致
+  input.connect(d)
+  d.connect(output)
+  input.connect(split)
+  split.connect(merge, 0, 1)
+  split.connect(merge, 1, 0)
+  merge.connect(c)
+  c.connect(output)
+  return [d, split, merge, c]
+}

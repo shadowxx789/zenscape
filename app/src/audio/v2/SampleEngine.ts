@@ -23,7 +23,7 @@ import type { Mode } from '../../types'
 import { planSession, type Layer, type SessionPlan, type SoundscapeManifest, type TextureSegment, type QinNote, type BellStrike } from './plan'
 import { presetFor, type Density } from './preset'
 import { newSeed } from './rng'
-import { buildSpaceIR } from './space'
+import { buildSpaceIR, connectTrueStereo } from './space'
 
 /** 预调度窗口。后台标签页的定时器会被节流到每秒一次甚至更慢，留 20s 余量；同时在场的节点仍只有十来个 */
 const LOOKAHEAD = 20 // 秒
@@ -52,6 +52,8 @@ type Graph = {
   shelf: BiquadFilterNode
   limiter: DynamicsCompressorNode
   fade: GainNode
+  /** 底层大空间的卷积 / 声道互换节点 */
+  bedRev: AudioNode[]
 }
 
 export class SampleEngine {
@@ -103,6 +105,10 @@ export class SampleEngine {
   }
   get currentPlan(): SessionPlan | null {
     return this.plan
+  }
+  /** 诊断用（?diag=1）：读 playbackStats */
+  get context(): AudioContext | null {
+    return this.ctx
   }
 
   // ───────────────────────── 会话
@@ -188,7 +194,7 @@ export class SampleEngine {
     this.live = []
     if (this.graph) {
       const g = this.graph
-      disconnectAll([...Object.values(g.layerGain), g.bedSum, g.bedOut, g.nature, g.events, g.master, g.shelf, g.limiter, g.fade])
+      disconnectAll([...Object.values(g.layerGain), g.bedSum, ...g.bedRev, g.bedOut, g.nature, g.events, g.master, g.shelf, g.limiter, g.fade])
       this.graph = null
     }
     this._playing = false
@@ -315,7 +321,11 @@ export class SampleEngine {
   private initContext(): void {
     const Ctor = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
     if (!Ctor) throw new Error('当前浏览器不支持 Web Audio API，请尝试使用 Chrome 或 Safari')
-    this.ctx = new Ctor()
+    // 'playback'：要大缓冲（桌面 Chrome 实测每次回调 5.3ms → 21ms）。
+    // 浏览器进后台、音频线程被降级时，单次回调偶尔超时也不至于掉块；这是冥想底声，多 20ms 延迟听不出来。
+    // 真机 A/B：URL 带 ?latency=interactive 回到旧行为
+    const q = new URLSearchParams(window.location.search).get('latency')
+    this.ctx = new Ctor({ latencyHint: q === 'interactive' ? 'interactive' : 'playback' })
     this._diagnostics = new AudioDiagnostics(this.ctx)
     this.ctx.addEventListener('statechange', () => {
       if (this.ctx && this.ctx.state === 'suspended' && this._playing) this.ctx.resume().catch(() => undefined)
@@ -366,12 +376,13 @@ export class SampleEngine {
 
     const bedOut = ctx.createGain()
     bedOut.connect(nature)
-    const conv = ctx.createConvolver()
-    conv.normalize = false
-    conv.buffer = buildSpaceIR(ctx, { rt60: S.rt60, wet: S.wet, dry: S.dry, predelay: S.predelay, lp: S.lp }, this.plan?.bedIrSeed ?? 1, 'stereo')
-    conv.connect(bedOut)
     const bedSum = ctx.createGain()
-    bedSum.connect(conv)
+    const bedRev = connectTrueStereo(
+      ctx,
+      bedSum,
+      buildSpaceIR(ctx, { rt60: S.rt60, wet: S.wet, dry: S.dry, predelay: S.predelay, lp: S.lp }, this.plan?.bedIrSeed ?? 1, 'stereo'),
+      bedOut,
+    )
     const layerGain = {
       bamboo: ctx.createGain(),
       breeze: ctx.createGain(),
@@ -385,7 +396,7 @@ export class SampleEngine {
       this._diagnostics.attachProbe('eventBus', events)
       this._diagnostics.attachProbe('limiter', limiter)
     }
-    return { layerGain, bedSum, bedOut, nature, events, master, shelf, limiter, fade }
+    return { layerGain, bedSum, bedOut, nature, events, master, shelf, limiter, fade, bedRev }
   }
 
   /** 把各层包络从会话 offset 秒起写成 AudioParam 曲线 */
@@ -591,18 +602,14 @@ export class SampleEngine {
       f.frequency.value = b.lp
       f.Q.value = Math.SQRT1_2
     }
-    const conv = ctx.createConvolver()
-    conv.normalize = false
-    conv.buffer = buildSpaceIR(ctx, { rt60: b.rt60, wet: P.wet, dry: P.dry, predelay: P.predelay, lp: P.rlp }, b.irSeed, 'stereo')
     const gain = ctx.createGain()
     gain.gain.value = db(b.gainDb + M.files.bell.gainDb)
     src.connect(lp1)
     lp1.connect(lp2)
-    lp2.connect(conv)
-    conv.connect(gain)
+    const rev = connectTrueStereo(ctx, lp2, buildSpaceIR(ctx, { rt60: b.rt60, wet: P.wet, dry: P.dry, predelay: P.predelay, lp: P.rlp }, b.irSeed, 'stereo'), gain)
     gain.connect(g.events)
     src.start(when)
-    this.track([src, lp1, lp2, conv, gain], src, b.rt60 + 1.5)
+    this.track([src, lp1, lp2, ...rev, gain], src, b.rt60 + 1.5)
   }
 
   private recordAt(when: number, type: RecentEvent['type'], pan: number): void {
