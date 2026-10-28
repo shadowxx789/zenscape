@@ -6,7 +6,7 @@ import { DENSITY_DETAILS } from './components/density'
 import { SessionView } from './components/SessionView'
 import type { Density } from './audio/engine'
 import type { Mode } from './types'
-import { loadPreferences, resetPreferences, savePreferences } from './storage/preferenceStore'
+import { DEFAULT_PREFS, loadPreferences, resetPreferences, savePreferences } from './storage/preferenceStore'
 import heroImage from './assets/zen-bamboo-stream.jpg'
 import heroImageAvif from './assets/zen-bamboo-stream.avif'
 import './App.css'
@@ -36,6 +36,9 @@ function App() {
     setDuration(defaults.duration)
     setDensity(defaults.density)
   }
+
+  const isDefault =
+    mode === DEFAULT_PREFS.mode && duration === DEFAULT_PREFS.duration && density === DEFAULT_PREFS.density
 
   const handleEnter = () => {
     if (isLeavingHome) return
@@ -96,7 +99,13 @@ function App() {
                     {MODE_DETAILS[mode].label} · {duration} 分钟 · {DENSITY_DETAILS[density].label}
                   </span>
                 </button>
-                <button type="button" className="reset-button" onClick={handleResetPreferences}>
+                <button
+                  type="button"
+                  className={`reset-button ${isDefault ? 'is-quiet' : ''}`}
+                  onClick={handleResetPreferences}
+                  aria-hidden={isDefault}
+                  tabIndex={isDefault ? -1 : 0}
+                >
                   恢复默认
                 </button>
               </div>
