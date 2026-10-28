@@ -152,7 +152,7 @@ export function SessionView({ mode, duration, density, onReturn }: SessionViewPr
   const progress = 1 - remaining / totalSeconds
   const currentPhase: Phase = getPhase(progress)
   const phaseLabel: Record<Phase, string> = {
-    entering: '入定',
+    entering: '渐入',
     settling: '安住',
     deep: '深境',
     returning: '回转',
@@ -191,7 +191,7 @@ export function SessionView({ mode, duration, density, onReturn }: SessionViewPr
         <span
           className="session-phase"
           role="status"
-          title="声景会经过 入定 · 安住 · 深境 · 回转 四段"
+          title="声景会经过 渐入 · 安住 · 深境 · 回转 四段"
           aria-label={`当前阶段：${isFinished ? '圆满' : phaseLabel[currentPhase]}，共四段`}
         >
           <span className="session-phase-steps" aria-hidden="true">
