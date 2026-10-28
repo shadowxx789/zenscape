@@ -29,6 +29,15 @@ import { buildSpaceIR, connectTrueStereo } from './space'
 const LOOKAHEAD = 20 // 秒
 const TICK_MS = 1000
 const FADE_OUT = 3
+/**
+ * 流式预渲染（?render=stream / bgtest H、I）：整段声音不再实时算，而是分段用 OfflineAudioContext 渲好，
+ * 实时线程只放现成的 AudioBuffer（和 bgtest B 一样轻）。手机后台 CPU 被压低时，只要离线渲染平均跑得比实时快就不断。
+ */
+const STREAM_FIRST = 8 // 秒：第一段短，起播快
+const STREAM_SEG = 30 // 秒：之后每段（每段 48kHz 立体声 ≈ 11.5MB）
+const STREAM_LEAD = 60 // 秒：最多提前渲染这么多（控制内存）
+/** 每段前面至少多渲的秒数：底层混响尾巴（rt60 2.6s → IR ≈ 3.7s）+ 限幅器状态。还在响的琴 / 钟另按其起点往前补 */
+const STREAM_PREROLL = 4
 /** 输出补偿：参考版整体约 -38 LUFS，手机上偏轻；默认主音量下抬 8dB，比例不变 */
 const MAKEUP_DB = 8
 
@@ -111,6 +120,16 @@ export class SampleEngine {
     return this.ctx
   }
 
+  private streamMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('render') === 'stream'
+  private streamFade: GainNode | null = null
+  private streamSrcs: AudioBufferSourceNode[] = []
+  private streamToken = 0
+  /** 诊断：渲染耗时 / 音频时长（前台、后台分开）；最小余量（已渲到 − 播放位置）；迟到段数 */
+  readonly streamStats = { fgWall: 0, fgAudio: 0, bgWall: 0, bgAudio: 0, minLead: Infinity, late: 0 }
+  setStreamMode(on: boolean): void {
+    this.streamMode = on
+  }
+
   private useElement = false
   private streamDest: MediaStreamAudioDestinationNode | null = null
   private outEl: HTMLAudioElement | null = null
@@ -151,6 +170,7 @@ export class SampleEngine {
     const M = this.manifest!
     if (!this.plan) this.plan = planSession(this.seed, this.durationSec, presetFor(this.mode, this.density), M)
     if (this.offset >= this.plan.dur - 0.5) this.offset = 0
+    if (this.streamMode) return this.playStream()
 
     let dest: AudioNode = ctx.destination
     if (this.useElement) {
@@ -176,7 +196,8 @@ export class SampleEngine {
   }
 
   stop(): void {
-    if (!this._playing || !this.ctx || !this.graph) {
+    const fadeNode = this.graph?.fade ?? this.streamFade
+    if (!this._playing || !this.ctx || !fadeNode) {
       this._playing = false
       return
     }
@@ -185,7 +206,7 @@ export class SampleEngine {
     const ctx = this.ctx
     const now = ctx.currentTime
     this.offset = Math.min(this.plan?.dur ?? 0, now - this.t0)
-    const fg = this.graph.fade.gain
+    const fg = fadeNode.gain
     fg.cancelScheduledValues(now)
     fg.setValueAtTime(fg.value, now)
     fg.linearRampToValueAtTime(0, now + FADE_OUT)
@@ -201,8 +222,15 @@ export class SampleEngine {
 
   /** 立即停声，记住暂停位置；进度由 prepareSession 重置 */
   stopImmediate(): void {
-    if (this.ctx && this.graph && this._playing && !this._fading) {
-      this.offset = Math.min(this.plan?.dur ?? 0, this.ctx.currentTime - this.t0)
+    if (this.ctx && (this.graph || this.streamFade) && this._playing && !this._fading) {
+      this.offset = Math.max(0, Math.min(this.plan?.dur ?? 0, this.ctx.currentTime - this.t0))
+    }
+    this.streamToken++
+    for (const src of this.streamSrcs) disconnectAll([src])
+    this.streamSrcs = []
+    if (this.streamFade) {
+      disconnectAll([this.streamFade])
+      this.streamFade = null
     }
     this.fadeToken++
     this._fading = false
@@ -469,6 +497,153 @@ export class SampleEngine {
     g.nature.gain.setTargetAtTime(L.nature, now, 0.08)
     g.events.gain.setTargetAtTime(L.events, now, 0.08)
     g.shelf.gain.setTargetAtTime(L.shelfDb, now, 0.1)
+  }
+
+  // ───────────────────────── 内部：流式预渲染
+
+  private async playStream(): Promise<void> {
+    const ctx = this.ctx!
+    const plan = this.plan!
+    const sr = ctx.sampleRate
+    const fade = ctx.createGain()
+    fade.gain.value = 0
+    fade.connect(ctx.destination)
+    this.streamFade = fade
+    const token = ++this.streamToken
+    const st = this.streamStats
+    Object.assign(st, { fgWall: 0, fgAudio: 0, bgWall: 0, bgAudio: 0, minLead: Infinity, late: 0 })
+    const startF = Math.round(this.offset * sr)
+    const durF = Math.floor(plan.dur * sr)
+    this.t0 = ctx.currentTime - this.offset // 第一段到之前就暂停时，offset 不至于乱跳
+    this._playing = true
+    let t0: number | null = null
+    let nextF = startF
+
+    // 第一段等到再返回（和实时引擎一样：play() 返回时已经开始出声）
+    const step = async (first: boolean): Promise<boolean> => {
+      const pos = t0 === null ? this.offset : ctx.currentTime - t0
+      const lead = nextF / sr - pos
+      if (t0 !== null) st.minLead = Math.min(st.minLead, lead)
+      if (t0 !== null && lead > STREAM_LEAD) return false
+      const segSec = first ? STREAM_FIRST : lead < 20 ? 20 : STREAM_SEG
+      const endF = Math.min(durF, nextF + Math.round(segSec * sr))
+      const hidden = document.visibilityState === 'hidden'
+      const w0 = performance.now()
+      const buf = await this.renderSpan(nextF, endF, sr)
+      if (this.streamToken !== token) return false
+      const wall = (performance.now() - w0) / 1000
+      const audio = (endF - nextF) / sr
+      if (hidden || document.visibilityState === 'hidden') {
+        st.bgWall += wall
+        st.bgAudio += audio
+      } else {
+        st.fgWall += wall
+        st.fgAudio += audio
+      }
+      if (t0 === null) {
+        t0 = Math.ceil((ctx.currentTime + 0.1) * sr) / sr - startF / sr
+        this.t0 = t0
+        const at = t0 + startF / sr
+        fade.gain.setValueAtTime(0, at)
+        fade.gain.linearRampToValueAtTime(1, at + (startF > 0 ? 1.5 : 0.5))
+      }
+      const when = t0 + nextF / sr
+      const skip = Math.max(0, ctx.currentTime + 0.02 - when)
+      if (skip > 0) st.late++
+      if (skip < audio) {
+        const src = ctx.createBufferSource()
+        src.buffer = buf
+        src.connect(fade)
+        src.start(when + skip, skip)
+        src.onended = () => {
+          src.disconnect()
+          this.streamSrcs = this.streamSrcs.filter((x) => x !== src)
+        }
+        this.streamSrcs.push(src)
+      }
+      nextF = endF
+      return true
+    }
+
+    await step(true)
+    void (async () => {
+      while (this.streamToken === token && nextF < durF) {
+        const did = await step(false)
+        if (this.streamToken !== token) return
+        if (!did) await new Promise((r) => setTimeout(r, 1000))
+      }
+    })()
+  }
+
+  /**
+   * 离线渲染会话里 [aF, bF) 这一段（帧）。前面多渲 STREAM_PREROLL 秒再丢掉，
+   * 让之前开始的片段、混响尾巴、限幅器状态都接上——拼起来和整段一次渲染逐样本一致（见 bgtest 的 null test）。
+   */
+  /** refLevels：按 renderOffline 的验收电平渲（null test 用） */
+  async renderSpan(aF: number, bF: number, sr: number, refLevels = false): Promise<AudioBuffer> {
+    const plan = this.plan!
+    const a = aF / sr
+    // 往前补到：至少 STREAM_PREROLL 秒；若有琴 / 钟在 a 之前敲响、到 a 还没响完，补到它的起点
+    let from = a - STREAM_PREROLL
+    const B = this.buffers!
+    for (const p of plan.phrases) {
+      for (const n of p.notes) {
+        const end = n.at + B.qin[n.clip].duration / Math.pow(2, n.cents / 1200) + n.rt60 + 1.5
+        if (n.at < a && end > a) from = Math.min(from, n.at)
+      }
+    }
+    for (const b of plan.bells) {
+      const end = b.at + B.bell.duration / Math.pow(2, b.cents / 1200) + b.rt60 + 1.5
+      if (b.at < a && end > a) from = Math.min(from, b.at)
+    }
+    // 底层片段：到 a 还在响（含混响尾巴）的，也从它自己的起点渲——中途切入只能近似它的等功率交叉
+    const tail = this.manifest!.bed.space.rt60 + 1.2
+    for (const seg of plan.segments) if (seg.at < a && seg.at + seg.len + tail > a) from = Math.min(from, seg.at)
+    const sF = Math.max(0, Math.floor(from * sr))
+    const preF = aF - sF
+    const off = new OfflineAudioContext(2, bF - sF, sr)
+    const g = this.buildGraph(off, off.destination, true)
+    g.fade.gain.value = 1
+    const s0 = sF / sr
+    const s1 = bF / sr
+    this.applyEnvelopesSpan(g, plan, s0, s1)
+    this.setStaticLevels(g, refLevels)
+    for (const seg of plan.segments) {
+      if (seg.at < s1 && seg.at + seg.len > s0) {
+        const when = seg.at - s0
+        this.scheduleSegment(off, g, seg, when, Math.max(0, -when))
+      }
+    }
+    for (const p of plan.phrases) for (const n of p.notes) if (n.at >= s0 && n.at < s1) this.scheduleQin(off, g, n, n.at - s0)
+    for (const b of plan.bells) if (b.at >= s0 && b.at < s1) this.scheduleBell(off, g, b, b.at - s0)
+    const out = await off.startRendering()
+    if (preF === 0) return out
+    const buf = new AudioBuffer({ numberOfChannels: 2, length: bF - aF, sampleRate: sr })
+    for (let c = 0; c < 2; c++) buf.copyToChannel(out.getChannelData(c).subarray(preF), c)
+    return buf
+  }
+
+  /** applyEnvelopes 的分段版：只写 [s0, s1] 这段的包络点，网格和整段版对齐 */
+  private applyEnvelopesSpan(g: Graph, plan: SessionPlan, s0: number, s1: number): void {
+    const M = this.manifest!
+    const R = plan.ctrlRate
+    const N = plan.envDb.bamboo.length
+    const i0 = Math.min(N - 2, Math.ceil(s0 * R - 1e-9))
+    const i1 = Math.max(i0 + 1, Math.min(N - 1, Math.ceil(s1 * R) + 1))
+    const len = i1 - i0 + 1
+    const start = i0 / R - s0
+    const dur = (len - 1) / R
+    const put = (param: AudioParam, at: (k: number) => number) => {
+      const curve = new Float32Array(len)
+      for (let k = 0; k < len; k++) curve[k] = at(i0 + k)
+      param.value = curve[0]
+      param.setValueCurveAtTime(curve, start, dur)
+    }
+    for (const layer of ['bamboo', 'breeze', 'water'] as Layer[]) {
+      const restore = M.files[layer].gainDb
+      put(g.layerGain[layer].gain, (i) => db(plan.envDb[layer][i] + restore))
+    }
+    put(g.bedOut.gain, (i) => db(plan.bedOutDb[i]))
   }
 
   // ───────────────────────── 内部：预调度

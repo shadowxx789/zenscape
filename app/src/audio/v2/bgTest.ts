@@ -8,6 +8,8 @@
  *   E  先离线渲染 90 秒 → <audio> 播   —— 实时零计算，走媒体通道
  *   F  完整引擎，开播时一次排完 10 分钟 —— 不再依赖网页定时器
  *   G  完整引擎 + 一个几乎无声的 <audio> 循环 —— 让系统当成「正在播放音乐」
+ *   H  流式预渲染：分段离线渲好，实时只放现成的 buffer（和 B 一样轻）
+ *   I  H + 几乎无声的 <audio>（状态栏显示播放）
  */
 import { sampleEngine } from './SampleEngine'
 
@@ -61,7 +63,8 @@ function quietLoop(): string {
   return URL.createObjectURL(wav(b))
 }
 
-async function engine(lookahead: number): Promise<void> {
+async function engine(lookahead: number, stream = false): Promise<void> {
+  sampleEngine.setStreamMode(stream)
   sampleEngine.setMediaElementOutput(false)
   sampleEngine.setLookahead(lookahead)
   sampleEngine.prepareSession('meditate', 600, 'mid')
@@ -124,6 +127,22 @@ const TESTS: Record<string, { name: string; run: (set: (s: string) => void) => P
       const stopEl = await playElement(url, 'G 竹间息', true)
       await engine(20)
       return () => { sampleEngine.stopImmediate(); stopEl(); URL.revokeObjectURL(url) }
+    },
+  },
+  H: {
+    name: '流式预渲染',
+    run: async () => {
+      await engine(20, true)
+      return () => { sampleEngine.stopImmediate(); sampleEngine.setStreamMode(false) }
+    },
+  },
+  I: {
+    name: '流式 + 静音<audio>',
+    run: async () => {
+      const url = quietLoop()
+      const stopEl = await playElement(url, 'I 竹间息', true)
+      await engine(20, true)
+      return () => { sampleEngine.stopImmediate(); sampleEngine.setStreamMode(false); stopEl(); URL.revokeObjectURL(url) }
     },
   },
   E: {
@@ -201,10 +220,15 @@ export function startBgTest(): void {
     lastHidden = document.hidden
     const r = (k: 'fg' | 'bg') => `${k === 'fg' ? '前台' : '后台'} ${acc[k].sec.toFixed(0)}s 掉块 ${acc[k].n} 次 / ${acc[k].ms.toFixed(0)}ms`
     const t = sampleEngine.tickStats
+    const ss = sampleEngine.streamStats
+    const pct = (w: number, a: number) => (a > 0 ? `${Math.round((100 * w) / a)}%` : '—')
+    const str = /^[HI] /.test(label)
+      ? `\n渲染耗时/时长 前台 ${pct(ss.fgWall, ss.fgAudio)}（${ss.fgAudio.toFixed(0)}s） 后台 ${pct(ss.bgWall, ss.bgAudio)}（${ss.bgAudio.toFixed(0)}s）\n最小余量 ${Number.isFinite(ss.minLead) ? ss.minLead.toFixed(1) : '—'}s，迟到 ${ss.late} 段`
+      : ''
     const eng = /^[CDFG] /.test(label)
       ? `\n定时器最大间隔 ${t.maxGap.toFixed(1)}s，最小余量 ${Number.isFinite(t.minLead) ? t.minLead.toFixed(1) : '—'}s，断粮 ${t.starved} 次`
       : ''
-    status.textContent = `${label}\n${statCtx ? `${r('fg')}\n${r('bg')}` : '（这一项没有掉块统计，靠耳朵）'}${eng}`
+    status.textContent = `${label}\n${statCtx ? `${r('fg')}\n${r('bg')}` : '（这一项没有掉块统计，靠耳朵）'}${eng}${str}`
   }
   document.addEventListener('visibilitychange', tick)
   setInterval(tick, 1000)
