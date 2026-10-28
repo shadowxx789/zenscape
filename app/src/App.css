@@ -165,9 +165,15 @@
   display: grid;
 }
 
-.mode-grid {
+.mode-grid,
+.density-grid {
   grid-template-columns: repeat(3, 1fr);
   border-bottom: 1px solid var(--border);
+}
+
+.density-grid .option-label {
+  font-size: 19px;
+  letter-spacing: 0;
 }
 
 .option-card,
@@ -245,6 +251,11 @@
   border-bottom: 1px solid var(--border);
 }
 
+/* 编辑自定义时长时，输入格占两份宽，「确定」不会被挤成竖排 */
+.duration-grid:has(.custom-duration-form) {
+  grid-template-columns: repeat(4, 1fr) 2fr;
+}
+
 .duration-pill {
   display: flex;
   align-items: center;
@@ -292,133 +303,14 @@
 }
 
 .custom-duration-submit {
-  padding: 0;
+  flex: none;
+  padding: 0 4px;
   border: 0;
   color: var(--accent);
   background: transparent;
-  font-size: 10px;
-  cursor: pointer;
-}
-
-.sound-settings,
-.session-tuning {
-  border-bottom: 1px solid var(--border);
-}
-
-.sound-settings {
-  margin-bottom: 27px;
-}
-
-.sound-settings summary,
-.session-tuning summary {
-  position: relative;
-  color: var(--text);
-  font-size: 12px;
-  letter-spacing: 0.12em;
-  cursor: pointer;
-  list-style: none;
-  transition: color 200ms ease;
-}
-
-.sound-settings summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 45px;
-}
-
-.sound-settings summary::-webkit-details-marker,
-.session-tuning summary::-webkit-details-marker {
-  display: none;
-}
-
-.sound-settings summary::after,
-.session-tuning summary::after {
-  content: "+";
-  color: var(--accent);
-  font-size: 17px;
-  font-weight: 300;
-  letter-spacing: 0;
-}
-
-.sound-settings[open] summary::after,
-.session-tuning[open] summary::after {
-  content: "−";
-}
-
-.sound-settings summary:hover,
-.session-tuning summary:hover {
-  color: var(--text-h);
-}
-
-.sound-controls {
-  padding: 9px 0 23px;
-}
-
-.slider-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-.slider-row {
-  display: grid;
-  grid-template-columns: 58px 1fr 26px;
-  align-items: center;
-  gap: 12px;
-}
-
-.slider-label {
-  color: var(--text);
-  font-size: 12px;
+  font-size: 11px;
   white-space: nowrap;
-}
-
-.slider-value {
-  color: var(--text);
-  font-size: 10px;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-}
-
-.zen-slider {
-  width: 100%;
-  height: 24px;
-  margin: 0;
-  border-radius: 0;
-  outline: none;
-  background-color: transparent;
-  background-position: center;
-  background-repeat: no-repeat;
-  background-size: 100% 2px;
   cursor: pointer;
-  appearance: none;
-  -webkit-appearance: none;
-}
-
-.zen-slider::-webkit-slider-thumb {
-  width: 11px;
-  height: 11px;
-  border: 0;
-  border-radius: 50%;
-  background: var(--accent);
-  cursor: pointer;
-  appearance: none;
-  -webkit-appearance: none;
-  transition: transform 160ms ease;
-}
-
-.zen-slider::-moz-range-thumb {
-  width: 11px;
-  height: 11px;
-  border: 0;
-  border-radius: 50%;
-  background: var(--accent);
-  cursor: pointer;
-}
-
-.zen-slider:hover::-webkit-slider-thumb {
-  transform: scale(1.25);
 }
 
 .home-actions {
@@ -632,6 +524,15 @@
   letter-spacing: 0.34em;
 }
 
+.session-density {
+  margin-left: 0.5em;
+  padding-left: 0.85em;
+  border-left: 1px solid var(--border);
+  color: var(--accent);
+  font-size: 0.8em;
+  letter-spacing: 0;
+}
+
 .session-orb {
   position: relative;
   display: grid;
@@ -802,45 +703,6 @@
   width: min(100%, 520px);
 }
 
-.session-tuning {
-  width: 100%;
-  border-top: 1px solid var(--border);
-  border-bottom: 0;
-}
-
-.session-tuning summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 42px;
-  text-align: left;
-}
-
-.session-sliders {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 17px 25px;
-  width: 100%;
-  padding: 9px 0 15px;
-}
-
-.session-slider-row {
-  display: grid;
-  grid-template-columns: 38px 1fr;
-  align-items: center;
-  gap: 10px;
-}
-
-.session-slider-label {
-  color: var(--text-h);
-  font-size: 12px;
-  text-align: left;
-}
-
-.session-sliders .zen-slider {
-  background-image: linear-gradient(var(--slider-track), var(--slider-track));
-}
-
 .zen-quote {
   margin: 0;
   color: rgba(238, 233, 220, 0.5);
@@ -864,8 +726,7 @@
 .primary-action:focus-visible,
 .ghost-action:focus-visible,
 .custom-duration-submit:focus-visible,
-summary:focus-visible,
-.zen-slider:focus-visible {
+summary:focus-visible {
   outline: 1px solid var(--accent);
   outline-offset: 4px;
 }
@@ -876,7 +737,6 @@ summary:focus-visible,
   .section-kicker { margin-bottom: 18px; }
   .hero-copy { margin-top: 19px; }
   .selector-block { margin-bottom: 20px; }
-  .sound-settings { margin-bottom: 20px; }
   .start-button { min-height: 54px; }
   .session-stage { padding-top: 12px; }
   .session-title { margin-bottom: 18px; }
@@ -917,7 +777,6 @@ summary:focus-visible,
   .hero-copy br { display: none; }
   .selector-block { margin-bottom: 24px; }
   .option-label { font-size: 18px; }
-  .sound-settings { margin-bottom: 23px; }
   .start-button { min-height: 58px; }
   .home-footer { padding-top: 4px; }
 
@@ -941,7 +800,21 @@ summary:focus-visible,
   .brand-sub { display: none; }
   .home-layout { padding-top: 34px; }
   .start-meta { font-size: 9px; }
-  .session-sliders { grid-template-columns: 1fr; }
+}
+
+/* 矮屏手机（如 360×640）：首屏够到「进入声景」 */
+@media (max-width: 600px) and (max-height: 700px) {
+  .home-view { padding-top: 16px; }
+  .home-layout { gap: 22px; padding: 26px 0 16px; }
+  .section-kicker { display: none; }
+  .hero-panel h1 { font-size: 44px; line-height: 1.12; }
+  .hero-copy { margin-top: 12px; font-size: 12px; line-height: 1.8; }
+  .selector-block { margin-bottom: 14px; }
+  .selector-heading { margin-bottom: 4px; }
+  .option-card { min-height: 42px; padding-bottom: 10px; }
+  .duration-pill { min-height: 40px; }
+  .mode-description { min-height: 0; margin-top: 7px; }
+  .start-button { min-height: 52px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -961,4 +834,8 @@ summary:focus-visible,
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+.nowrap {
+  white-space: nowrap;
 }

@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import { DurationSelector } from './components/DurationSelector'
 import { MODE_DETAILS, ModeSelector } from './components/ModeSelector'
+import { DensitySelector } from './components/DensitySelector'
+import { DENSITY_DETAILS } from './components/density'
 import { SessionView } from './components/SessionView'
-import { SoundControls } from './components/SoundControls'
-import type { SoundParams } from './audio/soundParams'
+import type { Density } from './audio/engine'
 import type { Mode } from './types'
-import { getModePreset } from './audio/soundscapes'
 import { loadPreferences, resetPreferences, savePreferences } from './storage/preferenceStore'
 import heroImage from './assets/zen-bamboo-stream.jpg'
 import './App.css'
@@ -17,23 +17,18 @@ const saved = loadPreferences()
 function App() {
   const [mode, setMode] = useState<Mode>(saved.mode)
   const [duration, setDuration] = useState(saved.duration)
-  const [soundParams, setSoundParams] = useState<SoundParams>(saved.soundParams)
+  const [density, setDensity] = useState<Density>(saved.density)
   const [isSessionActive, setIsSessionActive] = useState(false)
 
   useEffect(() => {
-    savePreferences({ mode, duration, soundParams })
-  }, [mode, duration, soundParams])
+    savePreferences({ mode, duration, density })
+  }, [mode, duration, density])
 
   const handleResetPreferences = () => {
     const defaults = resetPreferences()
     setMode(defaults.mode)
     setDuration(defaults.duration)
-    setSoundParams(defaults.soundParams)
-  }
-
-  const handleModeChange = (nextMode: Mode) => {
-    setMode(nextMode)
-    setSoundParams(getModePreset(nextMode).sound)
+    setDensity(defaults.density)
   }
 
   return (
@@ -42,8 +37,7 @@ function App() {
         <SessionView
           mode={mode}
           duration={duration}
-          soundParams={soundParams}
-          onSoundParamsChange={setSoundParams}
+          density={density}
           onReturn={() => setIsSessionActive(false)}
         />
       ) : (
@@ -65,25 +59,23 @@ function App() {
                 <p className="section-kicker">风过竹林 · 水落石间</p>
                 <h1 id="app-title">且坐，<br />听风。</h1>
                 <p className="hero-copy">
-                  风、水、钟与古琴，慢慢生成一片不重复的声景。<br />
-                  不必做什么，只要在这里。
+                  <span className="nowrap">风、水、钟与古琴，</span><span className="nowrap">慢慢生成一片不重复的声景。</span><br />
+                  <span className="nowrap">不必做什么，</span><span className="nowrap">只要在这里。</span>
                 </p>
               </div>
             </section>
 
             <section className="setup-panel" aria-label="声景设置">
-              <ModeSelector value={mode} onChange={handleModeChange} />
+              <ModeSelector value={mode} onChange={setMode} />
               <DurationSelector value={duration} onChange={setDuration} />
-
-              <details className="sound-settings">
-                <summary>细调声音</summary>
-                <SoundControls params={soundParams} onChange={setSoundParams} />
-              </details>
+              <DensitySelector value={density} onChange={setDensity} />
 
               <div className="home-actions">
                 <button type="button" className="start-button" onClick={() => setIsSessionActive(true)}>
                   <span>进入声景</span>
-                  <span className="start-meta">{MODE_DETAILS[mode].label} · {duration} 分钟</span>
+                  <span className="start-meta">
+                    {MODE_DETAILS[mode].label} · {duration} 分钟 · {DENSITY_DETAILS[density].label}
+                  </span>
                 </button>
                 <button type="button" className="reset-button" onClick={handleResetPreferences}>
                   恢复默认

@@ -1,12 +1,11 @@
 /**
- * preferenceStore.ts — BreezeScape M5
+ * preferenceStore.ts
  *
- * 读写用户偏好到 localStorage。
- * 保存：模式、时长、五个滑杆值。
+ * 读写用户偏好到 localStorage：模式、时长、声音疏密。
+ * 旧版存过的五个滑杆值（soundParams）读到后直接忽略。
  */
 
-import type { SoundParams } from '../audio/soundParams'
-import { DEFAULT_PARAMS } from '../audio/soundParams'
+import type { Density } from '../audio/engine'
 import type { Mode } from '../types'
 import type { DurationMinutes } from '../components/duration'
 import { DEFAULT_DURATION } from '../components/duration'
@@ -16,24 +15,24 @@ const STORAGE_KEY = 'zenscape:prefs'
 export interface Preferences {
   mode: Mode
   duration: DurationMinutes
-  soundParams: SoundParams
+  density: Density
 }
 
 export const DEFAULT_PREFS: Preferences = {
   mode: 'meditate',
   duration: DEFAULT_DURATION,
-  soundParams: { ...DEFAULT_PARAMS },
+  density: 'mid',
 }
 
 const VALID_MODES: Mode[] = ['meditate', 'sleep', 'focus']
+const VALID_DENSITIES: Density[] = ['sparse', 'mid', 'full']
 
 function isValidMode(m: unknown): m is Mode {
   return typeof m === 'string' && VALID_MODES.includes(m as Mode)
 }
 
-function validateParam(v: unknown, fallback: number): number {
-  if (typeof v !== 'number' || isNaN(v)) return fallback
-  return Math.max(0, Math.min(1, v))
+function isValidDensity(d: unknown): d is Density {
+  return typeof d === 'string' && VALID_DENSITIES.includes(d as Density)
 }
 
 export function loadPreferences(): Preferences {
@@ -41,18 +40,13 @@ export function loadPreferences(): Preferences {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return { ...DEFAULT_PREFS }
     const parsed = JSON.parse(raw)
-
-    const soundParams = { ...DEFAULT_PARAMS }
-    if (parsed.soundParams && typeof parsed.soundParams === 'object') {
-      for (const key of Object.keys(DEFAULT_PARAMS) as (keyof SoundParams)[]) {
-        soundParams[key] = validateParam(parsed.soundParams[key], DEFAULT_PARAMS[key])
-      }
-    }
-
     return {
       mode: isValidMode(parsed.mode) ? parsed.mode : DEFAULT_PREFS.mode,
-      duration: typeof parsed.duration === 'number' && parsed.duration > 0 ? parsed.duration : DEFAULT_PREFS.duration,
-      soundParams,
+      duration:
+        typeof parsed.duration === 'number' && parsed.duration > 0 && parsed.duration <= 180
+          ? parsed.duration
+          : DEFAULT_PREFS.duration,
+      density: isValidDensity(parsed.density) ? parsed.density : DEFAULT_PREFS.density,
     }
   } catch {
     return { ...DEFAULT_PREFS }
@@ -68,11 +62,7 @@ export function savePreferences(prefs: Preferences): void {
 }
 
 export function resetPreferences(): Preferences {
-  const prefs = {
-    mode: DEFAULT_PREFS.mode,
-    duration: DEFAULT_PREFS.duration,
-    soundParams: { ...DEFAULT_PREFS.soundParams },
-  }
+  const prefs = { ...DEFAULT_PREFS }
   savePreferences(prefs)
   return prefs
 }
