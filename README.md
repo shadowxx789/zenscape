@@ -124,9 +124,9 @@
 | v2 引擎 | 换成真实录音 + 种子乐谱；在手机外放下逐轮试听定稿 | ✅ 2026-10 |
 | 疏 · 中 · 满 | 五个滑杆退场，换成开始前选的三档疏密 | ✅ 2026-10 |
 | 界面重做 | 墨、雾、留白；呼吸圆环、无操作隐去、慢淡入淡出 | ✅ 2026-10 |
-| 入睡 / 专注 | 两个模式的声音出试听、定稿 | 📋 下一步 |
+| 一程 | 入山 → 见雾 → 听涧 → 安住 → 闻钟 → 归途，补真实录音，拟取代三模式（[构思](docs/JOURNEY_SPEC.md)） | 📝 构思中 |
 | 真机验证 | iPhone 锁屏后是否继续发声 | 📋 待验 |
-| Sprint 2–5 | 响应式输入、禅式扩展、生成叙事、个性化 | 💤 搁置 |
+| Sprint 2 · 3 · 5 | 响应式输入、禅式扩展、个性化 | ✖ 关闭 |
 
 在线地址后加 `?engine=v1` 可以回到 MVP 时期的合成引擎，作对比用。
 
@@ -137,6 +137,7 @@
 | 文档 | 内容 |
 |---|---|
 | 🎧 [CREDITS.md](CREDITS.md) | 声音素材来源与授权 |
+| 🧭 [docs/JOURNEY_SPEC.md](docs/JOURNEY_SPEC.md) | 一程：按六段编排的声景（构思稿） |
 | 🗺️ [docs/ROADMAP.md](docs/ROADMAP.md) | 2026-05 的六个 Sprint 规划（顶部有现状说明） |
 | 🔧 [docs/SPRINT_1_SPEC.md](docs/SPRINT_1_SPEC.md) | Sprint 1 施工图：合成声音升级（历史档案） |
 | 🤖 [docs/CODEX_PROMPTS.md](docs/CODEX_PROMPTS.md) | Sprint 1 的 Codex 提示词（历史档案） |
