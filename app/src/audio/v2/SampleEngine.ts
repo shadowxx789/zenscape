@@ -171,7 +171,7 @@ export class SampleEngine {
     this.applyLevels(true)
 
     this._playing = true
-    this.scheduleUntil(this.offset + LOOKAHEAD)
+    this.scheduleUntil(this.offset + this.lookahead)
     this.timer = setInterval(() => this.tick(), TICK_MS)
   }
 
@@ -476,7 +476,33 @@ export class SampleEngine {
   private tick(): void {
     if (!this.ctx || !this._playing) return
     const pos = this.ctx.currentTime - this.t0
-    this.scheduleUntil(pos + LOOKAHEAD)
+    this.noteTick(pos)
+    this.scheduleUntil(pos + this.lookahead)
+  }
+
+  // ───────────────────────── 诊断（?bgtest=1）：定时器在后台有没有被掐
+
+  private lookahead = LOOKAHEAD
+  private lastTickWall = 0
+  /** 最大定时器间隔（秒）、最小余量（已排程 − 播放位置，秒；≤ 0 = 断粮）、断粮次数 */
+  readonly tickStats = { maxGap: 0, minLead: Infinity, starved: 0 }
+  /** 实验：预排窗口（秒）。设成整段时长 = 开播时一次排完，不再依赖定时器 */
+  setLookahead(sec: number): void {
+    this.lookahead = sec
+  }
+  resetTickStats(): void {
+    Object.assign(this.tickStats, { maxGap: 0, minLead: Infinity, starved: 0 })
+    this.lastTickWall = 0
+  }
+  private noteTick(pos: number): void {
+    const now = performance.now() / 1000
+    if (this.lastTickWall) this.tickStats.maxGap = Math.max(this.tickStats.maxGap, now - this.lastTickWall)
+    this.lastTickWall = now
+    const lead = Math.min(this.cursor, this.plan?.dur ?? Infinity) - pos
+    if (this.cursor < (this.plan?.dur ?? 0)) {
+      this.tickStats.minLead = Math.min(this.tickStats.minLead, lead)
+      if (lead <= 0) this.tickStats.starved++
+    }
   }
 
   private scheduleUntil(until: number): void {

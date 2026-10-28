@@ -6,6 +6,8 @@
  *   C  完整引擎（现在线上的做法）       —— Web Audio + 实时卷积混响
  *   D  完整引擎 → <audio> 播出         —— 计算不变，出口换成媒体通道
  *   E  先离线渲染 90 秒 → <audio> 播   —— 实时零计算，走媒体通道
+ *   F  完整引擎，开播时一次排完 10 分钟 —— 不再依赖网页定时器
+ *   G  完整引擎 + 一个几乎无声的 <audio> 循环 —— 让系统当成「正在播放音乐」
  */
 import { sampleEngine } from './SampleEngine'
 
@@ -47,6 +49,27 @@ async function playElement(src: string, title: string, loop: boolean): Promise<(
   return () => { a.pause(); a.removeAttribute('src'); a.load() }
 }
 
+/** 10 秒、-80dB 的极轻噪声 WAV（全零可能被当成静音不给媒体通知） */
+function quietLoop(): string {
+  const sr = 8000
+  const ctx = new OfflineAudioContext(2, sr * 10, sr)
+  const b = ctx.createBuffer(2, sr * 10, sr)
+  for (let c = 0; c < 2; c++) {
+    const d = b.getChannelData(c)
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * 1e-4
+  }
+  return URL.createObjectURL(wav(b))
+}
+
+async function engine(lookahead: number): Promise<void> {
+  sampleEngine.setMediaElementOutput(false)
+  sampleEngine.setLookahead(lookahead)
+  sampleEngine.prepareSession('meditate', 600, 'mid')
+  await sampleEngine.play()
+  sampleEngine.resetTickStats()
+  statCtx = sampleEngine.context
+}
+
 const TESTS: Record<string, { name: string; run: (set: (s: string) => void) => Promise<() => void> }> = {
   A: {
     name: '<audio> 录音',
@@ -70,10 +93,7 @@ const TESTS: Record<string, { name: string; run: (set: (s: string) => void) => P
   C: {
     name: '完整引擎',
     run: async () => {
-      sampleEngine.setMediaElementOutput(false)
-      sampleEngine.prepareSession('meditate', 1800, 'mid')
-      await sampleEngine.play()
-      statCtx = sampleEngine.context
+      await engine(20)
       return () => sampleEngine.stopImmediate()
     },
   },
@@ -81,11 +101,29 @@ const TESTS: Record<string, { name: string; run: (set: (s: string) => void) => P
     name: '引擎 → <audio>',
     run: async () => {
       sampleEngine.setMediaElementOutput(true)
-      sampleEngine.prepareSession('meditate', 1800, 'mid')
+      sampleEngine.setLookahead(20)
+      sampleEngine.prepareSession('meditate', 600, 'mid')
       await sampleEngine.play()
+      sampleEngine.resetTickStats()
       statCtx = sampleEngine.context
       mediaSession('D 引擎→audio')
       return () => { sampleEngine.stopImmediate(); sampleEngine.setMediaElementOutput(false) }
+    },
+  },
+  F: {
+    name: '引擎 一次排完',
+    run: async () => {
+      await engine(100000)
+      return () => { sampleEngine.stopImmediate(); sampleEngine.setLookahead(20) }
+    },
+  },
+  G: {
+    name: '引擎 + 静音<audio>',
+    run: async () => {
+      const url = quietLoop()
+      const stopEl = await playElement(url, 'G 竹间息', true)
+      await engine(20)
+      return () => { sampleEngine.stopImmediate(); stopEl(); URL.revokeObjectURL(url) }
     },
   },
   E: {
@@ -162,7 +200,11 @@ export function startBgTest(): void {
     lastT = now
     lastHidden = document.hidden
     const r = (k: 'fg' | 'bg') => `${k === 'fg' ? '前台' : '后台'} ${acc[k].sec.toFixed(0)}s 掉块 ${acc[k].n} 次 / ${acc[k].ms.toFixed(0)}ms`
-    status.textContent = `${label}\n${statCtx ? `${r('fg')}\n${r('bg')}` : '（这一项没有掉块统计，靠耳朵）'}`
+    const t = sampleEngine.tickStats
+    const eng = /^[CDFG] /.test(label)
+      ? `\n定时器最大间隔 ${t.maxGap.toFixed(1)}s，最小余量 ${Number.isFinite(t.minLead) ? t.minLead.toFixed(1) : '—'}s，断粮 ${t.starved} 次`
+      : ''
+    status.textContent = `${label}\n${statCtx ? `${r('fg')}\n${r('bg')}` : '（这一项没有掉块统计，靠耳朵）'}${eng}`
   }
   document.addEventListener('visibilitychange', tick)
   setInterval(tick, 1000)
