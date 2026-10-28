@@ -15,11 +15,16 @@ import { SoundCredits } from './components/SoundCredits'
 
 const saved = loadPreferences()
 
+/** 首页淡出的时长；之后计时页再自己淡入 */
+const ENTER_MS = 900
+const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+
 function App() {
   const [mode, setMode] = useState<Mode>(saved.mode)
   const [duration, setDuration] = useState(saved.duration)
   const [density, setDensity] = useState<Density>(saved.density)
   const [isSessionActive, setIsSessionActive] = useState(false)
+  const [isLeavingHome, setIsLeavingHome] = useState(false)
 
   useEffect(() => {
     savePreferences({ mode, duration, density })
@@ -32,6 +37,15 @@ function App() {
     setDensity(defaults.density)
   }
 
+  const handleEnter = () => {
+    if (isLeavingHome) return
+    setIsLeavingHome(true)
+    window.setTimeout(() => {
+      setIsSessionActive(true)
+      setIsLeavingHome(false)
+    }, reducedMotion() ? 0 : ENTER_MS)
+  }
+
   return (
     <>
       {isSessionActive ? (
@@ -42,7 +56,7 @@ function App() {
           onReturn={() => setIsSessionActive(false)}
         />
       ) : (
-        <main className="home-view">
+        <main className={`home-view ${isLeavingHome ? 'is-leaving' : ''}`}>
           <picture className="home-landscape-frame" aria-hidden="true">
             <source srcSet={heroImageAvif} type="image/avif" />
             <img className="home-landscape" src={heroImage} alt="" />
@@ -76,7 +90,7 @@ function App() {
               <DensitySelector value={density} onChange={setDensity} />
 
               <div className="home-actions">
-                <button type="button" className="start-button" onClick={() => setIsSessionActive(true)}>
+                <button type="button" className="start-button" onClick={handleEnter}>
                   <span>进入声景</span>
                   <span className="start-meta">
                     {MODE_DETAILS[mode].label} · {duration} 分钟 · {DENSITY_DETAILS[density].label}

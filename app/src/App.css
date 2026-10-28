@@ -40,7 +40,35 @@
   object-fit: cover;
   object-position: 42% center;
   filter: saturate(0.58) brightness(0.74) contrast(0.92) blur(1.2px);
-  transform: scale(1.025);
+  transform: scale(1.03);
+  transform-origin: 62% 0%;
+  /* 竹影：约 26 秒一个来回，位移不到 0.4%，几乎察觉不到 */
+  animation: bamboo-sway 26s ease-in-out infinite;
+  will-change: transform;
+}
+
+@keyframes bamboo-sway {
+  0%, 100% { transform: scale(1.03) translate3d(0, 0, 0) rotate(0deg); }
+  50% { transform: scale(1.032) translate3d(-0.35%, 0.15%, 0) rotate(-0.12deg); }
+}
+
+/* 首页 → 计时页：首页先慢慢沉下去 */
+.home-view > * {
+  transition: opacity 900ms ease-in-out;
+}
+
+.home-view.is-leaving > * {
+  opacity: 0;
+}
+
+/* 计时页进来时也慢慢浮上来 */
+.session-view {
+  animation: view-in 1.4s ease-in-out both;
+}
+
+@keyframes view-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .home-veil {
@@ -621,14 +649,9 @@
 }
 
 .orb-breath {
-  stroke: rgba(200, 185, 145, 0.24);
-  stroke-width: 0.65;
-  opacity: 0.3;
-  transform-box: fill-box;
   transform-origin: center;
-  transform: scale(0.96);
-  /* 一次呼吸约 11 秒：吸 4.5 秒、呼 6.5 秒（含末尾短暂停顿），约每分钟 5.5 次 */
-  animation: orb-breath 11s infinite;
+  /* 约 10 秒一次：吸 4 秒、呼 6 秒；只在 1.5% 内起伏，作呼吸引导而不是动效 */
+  animation: orb-breath 10s ease-in-out infinite;
   animation-play-state: paused;
 }
 
@@ -637,10 +660,8 @@
 }
 
 @keyframes orb-breath {
-  0% { opacity: 0.3; transform: scale(0.96); animation-timing-function: cubic-bezier(0.37, 0, 0.63, 1); }
-  41% { opacity: 0.85; transform: scale(1.035); animation-timing-function: cubic-bezier(0.33, 0, 0.5, 1); }
-  92% { opacity: 0.3; transform: scale(0.96); }
-  100% { opacity: 0.3; transform: scale(0.96); }
+  0%, 100% { opacity: 0.82; transform: scale(0.992); }
+  40% { opacity: 1; transform: scale(1.008); }
 }
 
 .orb-inner {
@@ -771,6 +792,56 @@
   opacity: 0;
 }
 
+.session-header,
+.session-title,
+.session-copy,
+.session-playback,
+.countdown {
+  transition: opacity 2.4s ease-in-out;
+}
+
+.session-view.is-idle .session-header,
+.session-view.is-idle .session-title,
+.session-view.is-idle .session-copy,
+.session-view.is-idle .session-playback {
+  opacity: 0;
+}
+
+.session-view.is-idle .countdown {
+  opacity: 0.38;
+}
+
+.session-view.is-idle {
+  cursor: none;
+}
+
+/* 结束前：画面随最后一声钟一起暗下去 */
+.session-view .orb-ring,
+.particle-canvas {
+  transition: opacity 6s ease-in-out;
+}
+
+.session-view.is-ending::before {
+  opacity: 0.22;
+  transition-duration: 18s;
+}
+
+.session-view.is-ending .orb-ring,
+.session-view.is-ending .particle-canvas {
+  opacity: 0.45;
+}
+
+/* 离开：声音淡出的同时整页淡出 */
+.session-view.is-closing > * {
+  opacity: 0 !important;
+  transition: opacity 1.2s ease-in-out !important;
+}
+
+.session-view.is-closing::before {
+  opacity: 0 !important;
+  transition: opacity 1.2s ease-in-out !important;
+}
+
 .option-card:focus-visible,
 .duration-pill:focus-visible,
 .start-button:focus-visible,
@@ -878,7 +949,9 @@ summary:focus-visible {
     transition: none !important;
   }
 
-  .orb-breath {
+  .orb-breath,
+  .home-landscape,
+  .session-view {
     animation: none !important;
   }
 

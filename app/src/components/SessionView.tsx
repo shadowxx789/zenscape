@@ -10,6 +10,14 @@ import sessionImageAvif from '../assets/zen-night-valley.avif'
 
 const getRecentEvents = () => audioEngine.getRecentEvents()
 
+/** 播放中无操作多久后文字渐隐 */
+const IDLE_MS = 9000
+/** 离开计时页的淡出时长（与引擎淡出同节奏） */
+const LEAVE_MS = 1400
+/** 末尾这几秒里，画面跟着最后一声钟一起慢慢暗下去（引擎此时已在收尾） */
+const ENDING_S = 20
+const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+
 const PHASES: Phase[] = ['entering', 'settling', 'deep', 'returning']
 
 /** 画面光的亮度：疏暗一点、满亮一点，跟声音一致 */
@@ -35,6 +43,8 @@ export function SessionView({ mode, duration, density, onReturn }: SessionViewPr
   const [hasStarted, setHasStarted] = useState(false)
   const [isFinished, setIsFinished] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [isIdle, setIsIdle] = useState(false)
+  const [isClosing, setIsClosing] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const orbRef = useRef<HTMLDivElement>(null)
 
@@ -69,6 +79,23 @@ export function SessionView({ mode, duration, density, onReturn }: SessionViewPr
     return () => { audioEngine.stopImmediate() }
   }, [mode, totalSeconds, density])
 
+  // 播放中一段时间无操作：文字渐隐，只留圆环；任何触碰再浮现
+  useEffect(() => {
+    if (!isPlaying) return
+    let timer = setTimeout(() => setIsIdle(true), IDLE_MS)
+    const wake = () => {
+      setIsIdle(false)
+      clearTimeout(timer)
+      timer = setTimeout(() => setIsIdle(true), IDLE_MS)
+    }
+    const events = ['pointerdown', 'pointermove', 'keydown', 'touchstart', 'wheel'] as const
+    events.forEach((e) => window.addEventListener(e, wake, { passive: true }))
+    return () => {
+      clearTimeout(timer)
+      events.forEach((e) => window.removeEventListener(e, wake))
+    }
+  }, [isPlaying])
+
   // 页面回到前台时恢复 AudioContext（浏览器会在后台挂起它）
   useEffect(() => {
     const handleVisibility = () => {
@@ -84,6 +111,7 @@ export function SessionView({ mode, duration, density, onReturn }: SessionViewPr
     if (isFinished) return
     if (isPlaying) {
       setIsPlaying(false)
+      setIsIdle(false)
       audioEngine.stop()
       return
     }
@@ -102,8 +130,13 @@ export function SessionView({ mode, duration, density, onReturn }: SessionViewPr
   }
 
   const handleReturn = () => {
-    audioEngine.stopImmediate()
-    onReturn()
+    if (isClosing) return
+    setIsClosing(true)
+    if (audioEngine.playing) audioEngine.stop()
+    window.setTimeout(() => {
+      audioEngine.stopImmediate()
+      onReturn()
+    }, reducedMotion() ? 0 : LEAVE_MS)
   }
 
   const handleRestart = () => {
@@ -127,7 +160,15 @@ export function SessionView({ mode, duration, density, onReturn }: SessionViewPr
 
   return (
     <main
-      className={`session-view ${isPlaying ? 'is-playing' : ''} ${hasStarted ? 'has-started' : ''} ${isFinished ? 'is-finished' : ''}`}
+      className={[
+        'session-view',
+        isPlaying && 'is-playing',
+        hasStarted && 'has-started',
+        isFinished && 'is-finished',
+        isPlaying && isIdle && 'is-idle',
+        hasStarted && !isFinished && remaining <= ENDING_S && 'is-ending',
+        isClosing && 'is-closing',
+      ].filter(Boolean).join(' ')}
       aria-label="声景会话"
       style={{
         '--session-bg': `url(${sessionImage})`,
@@ -147,7 +188,12 @@ export function SessionView({ mode, duration, density, onReturn }: SessionViewPr
           <span aria-hidden="true">←</span> 离开声景
         </button>
         <span className="session-wordmark">竹间息</span>
-        <span className="session-phase" aria-label={`当前阶段：${isFinished ? '圆满' : phaseLabel[currentPhase]}`}>
+        <span
+          className="session-phase"
+          role="status"
+          title="声景会经过 入定 · 安住 · 深境 · 回转 四段"
+          aria-label={`当前阶段：${isFinished ? '圆满' : phaseLabel[currentPhase]}，共四段`}
+        >
           <span className="session-phase-steps" aria-hidden="true">
             {PHASES.map((p) => (
               <i key={p} className={p === currentPhase || (isFinished && p === 'returning') ? 'is-now' : ''} />
@@ -166,7 +212,7 @@ export function SessionView({ mode, duration, density, onReturn }: SessionViewPr
         </h1>
 
         <div className="session-orb" ref={orbRef}>
-          <svg viewBox="0 0 184 184" className="orb-ring" aria-hidden="true">
+          <svg viewBox="0 0 184 184" className="orb-ring orb-breath" aria-hidden="true">
             <circle className="orb-track" cx="92" cy="92" r="88" fill="none" />
             <circle
               className="orb-progress"
@@ -177,7 +223,6 @@ export function SessionView({ mode, duration, density, onReturn }: SessionViewPr
               strokeDasharray={`${progress * 552.92} 552.92`}
               transform="rotate(-90 92 92)"
             />
-            <circle className="orb-breath" cx="92" cy="92" r="62" fill="none" />
             {progress > 0 && (
               <circle
                 className="orb-head"
