@@ -858,6 +858,13 @@
   opacity: 0.45;
 }
 
+/* 结束后：圆环回到正常亮度当主角，画布上的余光随声音一起收干净——
+   否则 is-ending 一撤，opacity 从 0.45 弹回 1，已经淡掉的光斑会"重新亮起来" */
+.session-view.is-finished .particle-canvas {
+  opacity: 0;
+  transition: opacity 4s ease-in-out;
+}
+
 /* 离开：声音淡出的同时整页淡出 */
 .session-view.is-closing > * {
   opacity: 0 !important;

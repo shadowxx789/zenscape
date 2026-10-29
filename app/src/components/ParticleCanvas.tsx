@@ -45,8 +45,18 @@ const POLL_MS = 200
 const GOLD = '200, 185, 145'
 const MIST = '166, 190, 170'
 
+/** 光斑半径按视口短边算，手机和桌面看到的是同一种"轻" */
+const ORB_RADIUS_VMIN = 0.13
+const ORB_RADIUS_SPAN_VMIN = 0.05
+/** 亮度上限：低到只当背景的一层呼吸，不成为画面里的"一块" */
+const ORB_OPACITY = 0.04
+const ORB_OPACITY_SPAN = 0.015
+
+const easeOut = (x: number) => 1 - Math.pow(1 - x, 3)
+
 function makeOrbs(): Orb[] {
   // 一左一右，纵向错开；远离中间三分之一
+  const vmin = Math.min(window.innerWidth, window.innerHeight)
   const sides = [
     [0.12 + Math.random() * 0.14, 0.28 + Math.random() * 0.2],
     [0.74 + Math.random() * 0.14, 0.52 + Math.random() * 0.2],
@@ -54,15 +64,13 @@ function makeOrbs(): Orb[] {
   return sides.map(([nx, ny]) => ({
     nx,
     ny,
-    radius: 110 + Math.random() * 60,
+    radius: vmin * (ORB_RADIUS_VMIN + Math.random() * ORB_RADIUS_SPAN_VMIN),
     phase: Math.random() * Math.PI * 2,
     speed: 0.14 + Math.random() * 0.08, // 约 30–45 秒一次明灭
-    maxOpacity: 0.085 + Math.random() * 0.03,
+    maxOpacity: ORB_OPACITY + Math.random() * ORB_OPACITY_SPAN,
     driftPhase: Math.random() * Math.PI * 2,
   }))
 }
-
-const easeOut = (x: number) => 1 - Math.pow(1 - x, 3)
 
 export function ParticleCanvas({ isPlaying, brightness, getEvents, anchorRef }: ParticleCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
