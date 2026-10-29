@@ -50,9 +50,6 @@ if (typeof window !== 'undefined') {
   const w = window as unknown as { audioEngine: Engine; sampleEngine: typeof sampleEngine }
   w.audioEngine = engine
   w.sampleEngine = sampleEngine
-  if (new URLSearchParams(window.location.search).get('diag') === '1') {
-    void import('./v2/bgDiag').then((m) => m.startBgDiag(() => sampleEngine.context))
-  }
   if (new URLSearchParams(window.location.search).get('bgtest') === '1') {
     const go = () => void import('./v2/bgTest').then((m) => m.startBgTest())
     if (document.body) go()

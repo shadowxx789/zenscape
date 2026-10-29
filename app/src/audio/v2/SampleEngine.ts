@@ -120,7 +120,8 @@ export class SampleEngine {
     return this.ctx
   }
 
-  private streamMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('render') === 'stream'
+  /** 默认流式预渲染（安卓 Chrome 后台实时混响会断，真机验证 H 模式不断）；?render=live 回到实时引擎 */
+  private streamMode = !(typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('render') === 'live')
   private streamFade: GainNode | null = null
   private streamSrcs: AudioBufferSourceNode[] = []
   private streamToken = 0
@@ -128,18 +129,6 @@ export class SampleEngine {
   readonly streamStats = { fgWall: 0, fgAudio: 0, bgWall: 0, bgAudio: 0, minLead: Infinity, late: 0 }
   setStreamMode(on: boolean): void {
     this.streamMode = on
-  }
-
-  private useElement = false
-  private streamDest: MediaStreamAudioDestinationNode | null = null
-  private outEl: HTMLAudioElement | null = null
-  /** 实验（?bgtest=1 的 D 项）：图的出口改成 MediaStream → <audio>，下次 play() 生效 */
-  setMediaElementOutput(on: boolean): void {
-    this.useElement = on
-    if (!on && this.outEl) {
-      this.outEl.pause()
-      this.outEl.srcObject = null
-    }
   }
 
   // ───────────────────────── 会话
@@ -172,15 +161,7 @@ export class SampleEngine {
     if (this.offset >= this.plan.dur - 0.5) this.offset = 0
     if (this.streamMode) return this.playStream()
 
-    let dest: AudioNode = ctx.destination
-    if (this.useElement) {
-      this.streamDest ??= ctx.createMediaStreamDestination()
-      this.outEl ??= new Audio()
-      this.outEl.srcObject = this.streamDest.stream
-      await this.outEl.play()
-      dest = this.streamDest
-    }
-    const g = this.buildGraph(ctx, dest)
+    const g = this.buildGraph(ctx, ctx.destination)
     this.graph = g
     const now = ctx.currentTime + 0.12
     this.t0 = now - this.offset
@@ -191,7 +172,7 @@ export class SampleEngine {
     this.applyLevels(true)
 
     this._playing = true
-    this.scheduleUntil(this.offset + this.lookahead)
+    this.scheduleUntil(this.offset + LOOKAHEAD)
     this.timer = setInterval(() => this.tick(), TICK_MS)
   }
 
@@ -371,9 +352,7 @@ export class SampleEngine {
     if (!Ctor) throw new Error('当前浏览器不支持 Web Audio API，请尝试使用 Chrome 或 Safari')
     // 'playback'：要大缓冲（桌面 Chrome 实测每次回调 5.3ms → 21ms）。
     // 浏览器进后台、音频线程被降级时，单次回调偶尔超时也不至于掉块；这是冥想底声，多 20ms 延迟听不出来。
-    // 真机 A/B：URL 带 ?latency=interactive 回到旧行为
-    const q = new URLSearchParams(window.location.search).get('latency')
-    this.ctx = new Ctor({ latencyHint: q === 'interactive' ? 'interactive' : 'playback' })
+    this.ctx = new Ctor({ latencyHint: 'playback' })
     this._diagnostics = new AudioDiagnostics(this.ctx)
     this.ctx.addEventListener('statechange', () => {
       if (this.ctx && this.ctx.state === 'suspended' && this._playing) this.ctx.resume().catch(() => undefined)
@@ -547,6 +526,11 @@ export class SampleEngine {
         fade.gain.setValueAtTime(0, at)
         fade.gain.linearRampToValueAtTime(1, at + (startF > 0 ? 1.5 : 0.5))
       }
+      // 画面涟漪：琴 / 钟照常按时记进 recent events
+      const a = nextF / sr
+      const b = endF / sr
+      for (const p of plan.phrases) for (const n of p.notes) if (n.at >= a && n.at < b) this.recordAt(t0 + n.at, 'guqin_harmonic', n.pan)
+      for (const x of plan.bells) if (x.at >= a && x.at < b) this.recordAt(t0 + x.at, 'temple_bell', 0)
       const when = t0 + nextF / sr
       const skip = Math.max(0, ctx.currentTime + 0.02 - when)
       if (skip > 0) st.late++
@@ -651,33 +635,7 @@ export class SampleEngine {
   private tick(): void {
     if (!this.ctx || !this._playing) return
     const pos = this.ctx.currentTime - this.t0
-    this.noteTick(pos)
-    this.scheduleUntil(pos + this.lookahead)
-  }
-
-  // ───────────────────────── 诊断（?bgtest=1）：定时器在后台有没有被掐
-
-  private lookahead = LOOKAHEAD
-  private lastTickWall = 0
-  /** 最大定时器间隔（秒）、最小余量（已排程 − 播放位置，秒；≤ 0 = 断粮）、断粮次数 */
-  readonly tickStats = { maxGap: 0, minLead: Infinity, starved: 0 }
-  /** 实验：预排窗口（秒）。设成整段时长 = 开播时一次排完，不再依赖定时器 */
-  setLookahead(sec: number): void {
-    this.lookahead = sec
-  }
-  resetTickStats(): void {
-    Object.assign(this.tickStats, { maxGap: 0, minLead: Infinity, starved: 0 })
-    this.lastTickWall = 0
-  }
-  private noteTick(pos: number): void {
-    const now = performance.now() / 1000
-    if (this.lastTickWall) this.tickStats.maxGap = Math.max(this.tickStats.maxGap, now - this.lastTickWall)
-    this.lastTickWall = now
-    const lead = Math.min(this.cursor, this.plan?.dur ?? Infinity) - pos
-    if (this.cursor < (this.plan?.dur ?? 0)) {
-      this.tickStats.minLead = Math.min(this.tickStats.minLead, lead)
-      if (lead <= 0) this.tickStats.starved++
-    }
+    this.scheduleUntil(pos + LOOKAHEAD)
   }
 
   private scheduleUntil(until: number): void {

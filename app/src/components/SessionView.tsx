@@ -5,6 +5,7 @@ import { getPhase, type Phase } from '../audio/rules'
 import type { Mode } from '../types'
 import { engine as audioEngine, type Density } from '../audio/engine'
 import { ParticleCanvas } from './ParticleCanvas'
+import { pauseNowPlaying, startNowPlaying, stopNowPlaying } from '../audio/nowPlaying'
 import sessionImage from '../assets/zen-night-valley.jpg'
 import sessionImageAvif from '../assets/zen-night-valley.avif'
 
@@ -65,6 +66,7 @@ export function SessionView({ mode, duration, density, onReturn }: SessionViewPr
           setIsPlaying(false)
           setIsFinished(true)
           audioEngine.stop()
+          stopNowPlaying()
           return 0
         }
         return prev - 1
@@ -76,7 +78,10 @@ export function SessionView({ mode, duration, density, onReturn }: SessionViewPr
   // 新会话：新种子、从头开始；疏密在这里定，播放中不改。卸载清理
   useEffect(() => {
     audioEngine.prepareSession?.(mode, totalSeconds, density)
-    return () => { audioEngine.stopImmediate() }
+    return () => {
+      audioEngine.stopImmediate()
+      stopNowPlaying()
+    }
   }, [mode, totalSeconds, density])
 
   // 播放中一段时间无操作：文字渐隐，只留圆环；任何触碰再浮现
@@ -113,6 +118,7 @@ export function SessionView({ mode, duration, density, onReturn }: SessionViewPr
       setIsPlaying(false)
       setIsIdle(false)
       audioEngine.stop()
+      pauseNowPlaying()
       return
     }
     // 按下即退景：不等样本加载，失败时恢复原状态
@@ -121,18 +127,28 @@ export function SessionView({ mode, duration, density, onReturn }: SessionViewPr
       setIsPlaying(true)
       setHasStarted(true)
       setErrorMessage(null)
+      // 状态栏 / 锁屏卡片；它的播放 / 暂停按钮走同一个入口
+      void startNowPlaying(`${MODE_DETAILS[mode].label} · ${duration} 分钟`, {
+        onPlay: () => void playPauseRef.current(),
+        onPause: () => void playPauseRef.current(),
+      })
       await audioEngine.play()
     } catch (err) {
+      stopNowPlaying()
       setIsPlaying(false)
       setHasStarted(wasStarted)
       setErrorMessage(err instanceof Error ? err.message : '无法初始化音频，请检查浏览器设置')
     }
   }
 
+  const playPauseRef = useRef(handlePlayPause)
+  useEffect(() => { playPauseRef.current = handlePlayPause })
+
   const handleReturn = () => {
     if (isClosing) return
     setIsClosing(true)
     if (audioEngine.playing) audioEngine.stop()
+    stopNowPlaying()
     window.setTimeout(() => {
       audioEngine.stopImmediate()
       onReturn()
@@ -141,6 +157,7 @@ export function SessionView({ mode, duration, density, onReturn }: SessionViewPr
 
   const handleRestart = () => {
     audioEngine.stopImmediate()
+    stopNowPlaying()
     audioEngine.prepareSession?.(mode, totalSeconds, density)
     setRemaining(totalSeconds)
     setIsFinished(false)
