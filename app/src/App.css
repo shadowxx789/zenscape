@@ -926,6 +926,25 @@ summary:focus-visible {
     padding: 20px 20px 15px;
     padding-bottom: calc(15px + env(safe-area-inset-bottom, 0px));
   }
+  .home-landscape {
+    object-position: center;
+    filter: saturate(0.52) brightness(0.82) contrast(0.9) blur(0.8px);
+  }
+  .home-veil {
+    background:
+      linear-gradient(180deg, rgba(8, 13, 10, 0.16) 0%, rgba(8, 13, 10, 0.24) 28%, rgba(12, 17, 14, 0.58) 46%, rgba(12, 17, 14, 0.86) 66%, rgba(12, 17, 14, 0.94) 100%);
+  }
+  /* 只雾化标题与控件所在的下半幅；上方竹影保留清晰边界与暗部层次。 */
+  .home-veil::after {
+    content: "";
+    position: absolute;
+    inset: 28% 0 0;
+    background: linear-gradient(180deg, transparent, rgba(12, 17, 14, 0.08) 35%, rgba(12, 17, 14, 0.18));
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    -webkit-mask-image: linear-gradient(180deg, transparent, #000 22%, #000);
+    mask-image: linear-gradient(180deg, transparent, #000 22%, #000);
+  }
   .brand-name { font-size: 17px; }
   .brand-sub { margin-left: 12px; padding-left: 12px; font-size: 8px; }
   .header-note { display: none; }

@@ -9,6 +9,8 @@ import type { Mode } from './types'
 import { DEFAULT_PREFS, loadPreferences, resetPreferences, savePreferences } from './storage/preferenceStore'
 import heroImage from './assets/zen-bamboo-stream.jpg'
 import heroImageAvif from './assets/zen-bamboo-stream.avif'
+import heroMobileJpg from './assets/zen-bamboo-stream-mobile.jpg'
+import heroMobileAvif from './assets/zen-bamboo-stream-mobile.avif'
 import './App.css'
 import { DiagnosticsPanel } from './components/DiagnosticsPanel'
 import { SoundCredits } from './components/SoundCredits'
@@ -61,6 +63,8 @@ function App() {
       ) : (
         <main className={`home-view ${isLeavingHome ? 'is-leaving' : ''}`}>
           <picture className="home-landscape-frame" aria-hidden="true">
+            <source media="(max-width: 600px)" srcSet={heroMobileAvif} type="image/avif" />
+            <source media="(max-width: 600px)" srcSet={heroMobileJpg} type="image/jpeg" />
             <source srcSet={heroImageAvif} type="image/avif" />
             <img className="home-landscape" src={heroImage} alt="" />
           </picture>
