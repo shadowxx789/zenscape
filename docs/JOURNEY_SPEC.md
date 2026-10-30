@@ -1,6 +1,6 @@
 # 一程：按「入山 → 归途」编排的声景（构思稿）
 
-> 草案 v0.2 · 2026-10-29 · 状态：构思，未开工（Q1–Q4 已定，见第 8 节）
+> 草案 v0.3 · 2026-10-30 · 状态：素材第一批已定选（见 4.4），引擎未开工
 > 来源：ROADMAP 第 7 节 Sprint 4「生成叙事剧本」，按 v2 引擎（真实录音 + 种子乐谱）重新设计。
 > 本文只定方向和待决问题；素材定稿、参数定稿都以 Eric 在手机外放下的试听为准。
 
@@ -82,6 +82,36 @@ Sprint 4 的思路更好：**一次会话是一段路**。声音不是一个场�
 - **听感**：在手机外放模拟下试听；先出 10–20 秒试听片段给 Eric 选，选中后才做正式导出。
 - **体积**：新素材合计目标 ≤ 6MB（总量 ≤ 10MB）。移动端首屏不等全部下完：先载入山 + 见雾，其余在播放中后台预取。
 
+### 4.4 第一批定选（2026-10-30，Eric 两轮试听）
+
+试听都叠在定稿 C++6 的风歇底上（约 -51 手机 dB）。下表「电平」是试听里用的手机模拟 RMS（dB），做原型时作为起点，不是定稿。
+
+| 类 | 录音 | 作者 | 授权 | 电平 | 处理 |
+|---|---|---|---|---|---|
+| 远处林鸟 | [Morning in swiss mountain](https://freesound.org/people/xkeril/sounds/757868/) | xkeril | CC0 1.0 | -53 | — |
+| 远处林鸟 | [Forest, Woods, Few birds and insects, Soft breez](https://freesound.org/people/fran_marenco/sounds/796150/) | fran_marenco | CC0 1.0 | -53 | — |
+| 远处林鸟 | [Rocky Mountain Outdoors:  wind and birds](https://freesound.org/people/petebuchwald/sounds/288899/) | petebuchwald | CC0 1.0 | -57 | 比其他鸟再轻 4 dB |
+| 远处林鸟 | [Forest_Summer_Day_Quiet_Calm_Birds_Insects_Atmo_](https://freesound.org/people/Villehardt/sounds/613995/) | Villehardt | CC0 1.0 | -53 | — |
+| 叶尖滴水 | [Rain_Water_Drop_Drizzle_Forest_Leaves_Leaf_Fall_](https://freesound.org/people/Sahand.Zangeneh/sounds/736280/) | Sahand.Zangeneh | CC0 1.0 | -56 | — |
+| 叶尖滴水 | [Rain Water Dripping Softly](https://freesound.org/people/florianreichelt/sounds/459983/) | florianreichelt | CC0 1.0 | -56 | — |
+| 近处溪水 | [Stream River Water Up Close](https://freesound.org/people/jackthemurray/sounds/433589/) | jackthemurray | CC0 1.0 | -52 | — |
+| 近处溪水 | [River - Light stream, daytime](https://freesound.org/people/Vrymaa/sounds/734931/) | Vrymaa | CC0 1.0 | -52 | — |
+| 近处溪水 | [heb_brook_water_bubbles_rocks_Close_perspective.](https://freesound.org/people/bradst/sounds/74448/) | bradst | CC0 1.0 | -52 | — |
+| 近处溪水 | [Clean cold babbling brook](https://freesound.org/people/gregwht/sounds/833142/) | gregwht | CC BY 4.0 | -52 | — |
+| 山谷空气底 | [Ambiance_ColdesMosses_Middle mountain_Switzerlan](https://freesound.org/people/Bruceosonhadordeverdade/sounds/707609/) | Bruceosonhadordeverdade | CC0 1.0 | -57 | B 稀一点 |
+| 山谷空气底 | [Chimborazo Volcano First Base Camp Mountain Outd](https://freesound.org/people/RobertWedderburn/sounds/613628/) | RobertWedderburn | CC0 1.0 | -57 | B 稀一点 |
+| 山谷空气底 | [EXT Blustery quiet 1.wav](https://freesound.org/people/deleted_user_2104797/sounds/324493/) | deleted_user_2104797 | CC0 1.0 | -57 | B 稀一点 |
+| 第二口钟 / 磬 | [Bell at Daitokuji temple,kyoto.wav](https://freesound.org/people/nahmandub/sounds/131348/) | nahmandub | CC0 1.0 | 钟头 -40 | B 高音重削：2.2k 低通 + 700Hz 以上 -12 dB；钟头 -40 |
+| 第二口钟 / 磬 | [temple_bell_002.wav](https://freesound.org/people/tec_studio/sounds/668647/) | tec_studio | CC0 1.0 | 钟头 -40 | 原样；钟头 -40 |
+| 远处虫鸣 | [Quiet Night Atmosphere – Soft Crickets (Eagle Mo](https://freesound.org/people/Goldenboy76/sounds/857163/) | Goldenboy76 | CC0 1.0 | -57 | — |
+| 远处虫鸣 | [Night Woods](https://freesound.org/people/widgetstudios/sounds/532301/) | widgetstudios | CC0 1.0 | -57 | — |
+
+试听意见：林鸟 4「要小声，不然破坏氛围」；滴水、溪水都「注意音量不要太大」；空气底「稍微有一点点密」，选了稀一点的 B 版；唤钟「把高音削弱」，选了重削的 B 版。
+
+未选：林鸟 3、滴水 1/2/4、溪水 5、钟磬 3–5（颂钵三个）、虫鸣 2/4。
+
+待办：试听用的是 Freesound 公开预览版 mp3。正式导出前要登录 Freesound 下载原始文件，按同样的处理重做一遍；CC BY 的几条要写进 `CREDITS.md` 和 `soundscape.json` 的 `credits`。
+
 ## 5. 引擎改动（大致）
 
 都在 `app/src/audio/v2/`，沿用「开始时按种子排好整场，播放中不改」：
@@ -107,7 +137,7 @@ Sprint 4 的思路更好：**一次会话是一段路**。声音不是一个场�
 | 步 | 内容 | 产出 | 谁定 |
 |---|---|---|---|
 | 0 | 本文定稿 | 回答第 8 节问题 | Eric |
-| 1 | 找素材 | 每类 3–5 个候选，10–20 秒试听片段 + 授权表 | Eric 选 |
+| 1 | 找素材 | 每类 3–5 个候选，10–20 秒试听片段 + 授权表 | Eric 选（✅ 第一批已定，见 4.4） |
 | 2 | 段落编排原型 | `stage.ts` + `plan.ts`，先用现有素材 + 选中的新素材渲染整程 | — |
 | 3 | 整程试听 | 中档 5 / 10 / 20 分钟各 2 个种子，手机外放模拟 | Eric 逐轮定 |
 | 4 | 疏 / 满 | 在定稿中档上调两档，再试听 | Eric 定 |
