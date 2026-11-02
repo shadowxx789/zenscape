@@ -968,10 +968,14 @@ summary:focus-visible {
   .session-stage { padding: 20px 0 12px; }
   .session-title { margin-bottom: 22px; font-size: 17px; }
   .session-orb { width: min(265px, 69vw); }
-  .countdown { font-size: 44px; }
+  .orb-track {
+    stroke: rgba(238, 233, 220, 0.2);
+    stroke-width: 0.75;
+  }
+  .countdown { font-size: 41px; letter-spacing: 0.02em; }
   .session-phase-steps { display: none; }
-  .session-copy { margin-top: 22px; font-size: 11px; }
-  .session-playback { margin-top: 20px; }
+  .session-copy { margin-top: 14px; font-size: 11px; }
+  .session-playback { margin-top: 12px; }
   .session-play-button { width: 58px; height: 58px; }
   .zen-quote { font-size: 10px; letter-spacing: 0.1em; }
 }
