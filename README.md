@@ -218,7 +218,7 @@ npm run build      # 产物在 app/dist/
 
 ## 部署
 
-合进 `main` 不会自动上线。站点由 `gh-pages` 分支提供：构建后用 `app/dist/` 的内容替换 `gh-pages` 根目录的构建产物（保留 `sprint-1.5/` 与 `.nojekyll`），推送即可。
+合进 `main` 不会自动上线。站点由 `gh-pages` 分支提供：构建后用 `app/dist/` 的内容替换 `gh-pages` 根目录的构建产物（只换 `assets/`、`index.html`、`sw.js` 等产物，保留 `.nojekyll` 和其余源码副本），推送即可。
 
 已部署：[shadowxx789.github.io/zenscape](https://shadowxx789.github.io/zenscape/)。手机若打开过旧版，PWA 缓存可能要关掉页面重开一两次才会更新。
 
