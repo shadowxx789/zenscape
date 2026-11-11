@@ -5,6 +5,7 @@ import { getPhase, type Phase } from '../audio/rules'
 import type { Mode } from '../types'
 import { engine as audioEngine, type Density } from '../audio/engine'
 import { ParticleCanvas } from './ParticleCanvas'
+import { LivingBackdrop } from './livingBackdrop/LivingBackdrop'
 import { pauseNowPlaying, startNowPlaying, stopNowPlaying } from '../audio/nowPlaying'
 import sessionImage from '../assets/zen-night-valley.jpg'
 import sessionImageAvif from '../assets/zen-night-valley.avif'
@@ -46,6 +47,7 @@ export function SessionView({ mode, duration, density, onReturn }: SessionViewPr
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isIdle, setIsIdle] = useState(false)
   const [isClosing, setIsClosing] = useState(false)
+  const [isLive, setIsLive] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const orbRef = useRef<HTMLDivElement>(null)
 
@@ -185,6 +187,7 @@ export function SessionView({ mode, duration, density, onReturn }: SessionViewPr
         isPlaying && isIdle && 'is-idle',
         hasStarted && !isFinished && remaining <= ENDING_S && 'is-ending',
         isClosing && 'is-closing',
+        isLive && 'has-living',
       ].filter(Boolean).join(' ')}
       aria-label="声景会话"
       style={{
@@ -192,6 +195,12 @@ export function SessionView({ mode, duration, density, onReturn }: SessionViewPr
         '--session-bg-set': `image-set(url(${sessionImageAvif}) type("image/avif"), url(${sessionImage}) type("image/jpeg"))`,
       } as React.CSSProperties}
     >
+      <LivingBackdrop
+        scene="night"
+        className="session-living"
+        getSrc={() => sessionImage}
+        onReady={setIsLive}
+      />
       <div className="grain" aria-hidden="true" />
       <ParticleCanvas
         isPlaying={isPlaying}

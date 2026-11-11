@@ -52,6 +52,32 @@
   50% { transform: scale(1.032) translate3d(-0.35%, 0.15%, 0) rotate(-0.12deg); }
 }
 
+/* 动态背景（three.js）：与下面的静态图同位、同滤镜；就绪后才显形，静态层随之隐去 */
+.living-backdrop {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.living-backdrop.is-live {
+  opacity: 1;
+}
+
+.home-living {
+  z-index: -3;
+  filter: saturate(0.58) brightness(0.74) contrast(0.92) blur(1.2px);
+  transform: scale(1.03);
+  transform-origin: 62% 0%;
+}
+
+.home-view.has-living .home-landscape {
+  visibility: hidden;
+  animation: none;
+}
+
 /* 首页 → 计时页：首页先慢慢沉下去 */
 .home-view > * {
   transition: opacity 900ms ease-in-out;
@@ -512,6 +538,34 @@
   opacity: 0.45;
 }
 
+/* 计时页动态背景：替代 ::before，沿用它的滤镜和随会话变暗的节奏 */
+.session-living {
+  z-index: -2;
+  filter: brightness(0.62) saturate(0.58);
+  transform: scale(1.02);
+}
+
+.session-view.has-living::before {
+  visibility: hidden;
+}
+
+.session-view .session-living.is-live {
+  transition: opacity 12s var(--ease-quiet);
+}
+
+.session-view.has-started .session-living.is-live {
+  opacity: 0.45;
+}
+
+.session-view.is-ending .session-living.is-live {
+  opacity: 0.22;
+  transition-duration: 18s;
+}
+
+.session-view.is-closing > .session-living {
+  transition: opacity 1.2s ease-in-out !important;
+}
+
 .session-view::after {
   z-index: -1;
   background:
@@ -533,7 +587,7 @@
   z-index: 0;
 }
 
-.session-view > :not(.particle-canvas):not(.grain) {
+.session-view > :not(.particle-canvas):not(.grain):not(.living-backdrop) {
   position: relative;
   z-index: 1;
 }
@@ -926,7 +980,8 @@ summary:focus-visible {
     padding: 20px 20px 15px;
     padding-bottom: calc(15px + env(safe-area-inset-bottom, 0px));
   }
-  .home-landscape {
+  .home-landscape,
+  .home-living {
     object-position: center;
     filter: saturate(0.52) brightness(0.82) contrast(0.9) blur(0.8px);
   }

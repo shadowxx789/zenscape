@@ -14,6 +14,20 @@ import heroMobileAvif from './assets/zen-bamboo-stream-mobile.avif'
 import './App.css'
 import { DiagnosticsPanel } from './components/DiagnosticsPanel'
 import { SoundCredits } from './components/SoundCredits'
+import { LivingBackdrop } from './components/livingBackdrop/LivingBackdrop'
+
+/** 读首页 <img> 实际用的图和 object-position，让动态层与静态层完全对齐 */
+const homeImg = () => document.querySelector<HTMLImageElement>('.home-landscape')
+const homeSrc = () => {
+  const img = homeImg()
+  return img ? img.currentSrc || img.src : null
+}
+const homeFocus = (): [number, number] => {
+  const img = homeImg()
+  const pos = img ? getComputedStyle(img).objectPosition.split(' ') : []
+  const pct = (v: string | undefined) => (v && v.endsWith('%') ? parseFloat(v) / 100 : 0.5)
+  return [pct(pos[0]), pct(pos[1])]
+}
 
 const saved = loadPreferences()
 
@@ -27,6 +41,7 @@ function App() {
   const [density, setDensity] = useState<Density>(saved.density)
   const [isSessionActive, setIsSessionActive] = useState(false)
   const [isLeavingHome, setIsLeavingHome] = useState(false)
+  const [homeLive, setHomeLive] = useState(false)
 
   useEffect(() => {
     savePreferences({ mode, duration, density })
@@ -61,13 +76,14 @@ function App() {
           onReturn={() => setIsSessionActive(false)}
         />
       ) : (
-        <main className={`home-view ${isLeavingHome ? 'is-leaving' : ''}`}>
+        <main className={['home-view', isLeavingHome && 'is-leaving', homeLive && 'has-living'].filter(Boolean).join(' ')}>
           <picture className="home-landscape-frame" aria-hidden="true">
             <source media="(max-width: 600px)" srcSet={heroMobileAvif} type="image/avif" />
             <source media="(max-width: 600px)" srcSet={heroMobileJpg} type="image/jpeg" />
             <source srcSet={heroImageAvif} type="image/avif" />
             <img className="home-landscape" src={heroImage} alt="" />
           </picture>
+          <LivingBackdrop scene="bamboo" className="home-living" getSrc={homeSrc} getFocus={homeFocus} onReady={setHomeLive} />
           <div className="grain" aria-hidden="true" />
           <div className="home-veil" aria-hidden="true" />
 
