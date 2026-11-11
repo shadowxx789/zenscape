@@ -179,7 +179,11 @@ void main() {
   float warm = smoothstep(0.0, 0.06, col.r - col.b);
 
   // 星：天上原有的亮点各自明灭
-  float star = smoothstep(0.18, 0.4, lum) * sky;
+  // 只认比周围明显亮的孤点，否则整片天空的底色都会被当成星星闪成噪点
+  vec2 px = 3.0 / uView;
+  float around = 0.25 * (luma(sampleImg(uv + vec2(px.x, 0.0))) + luma(sampleImg(uv - vec2(px.x, 0.0)))
+                       + luma(sampleImg(uv + vec2(0.0, px.y))) + luma(sampleImg(uv - vec2(0.0, px.y))));
+  float star = smoothstep(0.04, 0.12, lum - around) * sky;
   col *= 1.0 + star * snoise(vec3(q * vec2(160.0, 107.0), t * 0.9)) * 0.5 * k;
 
   // 岸边灯火：暖色亮点轻轻跳
