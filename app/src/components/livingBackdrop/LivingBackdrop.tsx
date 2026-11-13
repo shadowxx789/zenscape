@@ -28,11 +28,15 @@ const INTRO_S = 4
 /** 内部渲染分辨率上限（长边像素）：背景本来就是柔焦的，不需要满分辨率 */
 const MAX_LONG_EDGE = 1280
 
-/** 动效强度：?motion=0.6 / 1 / 1.6 供比较；0 关闭 */
-function motionStrength(): number {
+/** 默认强度：Eric 看过 1/2/3 对比后选定（首页 2，计时页 1） */
+const DEFAULT_STRENGTH: Record<BackdropScene, number> = { bamboo: 2, night: 1 }
+
+/** 动效强度：?motion=1 / 2 / 3 可临时覆盖供比较；0 关闭 */
+function motionStrength(scene: BackdropScene): number {
+  const fallback = DEFAULT_STRENGTH[scene]
   const raw = new URLSearchParams(window.location.search).get('motion')
-  const v = raw === null ? 1 : Number(raw)
-  return Number.isFinite(v) ? Math.max(0, Math.min(3, v)) : 1
+  const v = raw === null ? fallback : Number(raw)
+  return Number.isFinite(v) ? Math.max(0, Math.min(3, v)) : fallback
 }
 
 export function LivingBackdrop({ scene, getSrc, getFocus, className, onReady }: LivingBackdropProps) {
@@ -49,7 +53,7 @@ export function LivingBackdrop({ scene, getSrc, getFocus, className, onReady }: 
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
-    const k = motionStrength()
+    const k = motionStrength(scene)
     const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
     if (k === 0 || reduced) return
 
