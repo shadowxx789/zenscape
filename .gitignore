@@ -7,3 +7,7 @@ dist-ssr/
 
 # local A/B audition renders (not tracked)
 ab-demo/
+
+# verify 工具的本地渲染接收目录（engine 渲染对比用，不入库）
+tools/verify/engine_out/
+tools/verify/reference_report.json

@@ -1,6 +1,6 @@
 /**
- * 乐谱（plan）验收：和 Python 参考版（ab-demo/render_r6.py + render_r8.py Cpp6）同一套作曲/疏密门槛。
- * 声音层面的门槛（手机模拟响度、深静实测、钟/琴高出底多少）在 ab-demo/verify_engine.py 里对离线渲染结果测。
+ * 乐谱（plan）验收：和 Python 参考版（tools/verify/render_r6.py + render_r8.py Cpp6）同一套作曲/疏密门槛。
+ * 声音层面的门槛（手机模拟响度、深静实测、钟/琴高出底多少）在 tools/verify/verify_engine.py 里对离线渲染结果测。
  */
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'

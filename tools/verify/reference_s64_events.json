@@ -1,0 +1,5 @@
+{
+  "_comment": "C++6 finalized render (R8_Cpp6) seed 64 timeline: bell strike instants and the starting instant of each guqin phrase. Source: the seed 64 timeline printed by render_r8.py.",
+  "bells": [150.34, 338.9],
+  "phrases": [{ "t": 32.99 }, { "t": 168.84 }, { "t": 295.92 }]
+}
