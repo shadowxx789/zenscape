@@ -39,7 +39,10 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,jpg,jpeg,avif,woff,woff2}'],
+        // mp3 + soundscape.json 一起预缓存：离线（飞行模式）开场才有声
+        globPatterns: ['**/*.{js,css,html,svg,png,jpg,jpeg,avif,woff,woff2,mp3,json}'],
+        // 录音里最大 1.6MB，默认 2MiB 上限够用但余量小，显式放宽避免以后静默漏缓存
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         // 不自动 skipWaiting，避免播放中页面被新 SW 接管
         skipWaiting: false,
         clientsClaim: false,
