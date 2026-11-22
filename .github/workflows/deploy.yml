@@ -1,0 +1,79 @@
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: build / test / lint
+        working-directory: app
+        run: |
+          npm ci
+          rm -rf dist
+          npm run build
+          npm test
+          npm run lint
+
+      - name: deploy gh-pages (artifacts only)
+        env:
+          LIVE: https://shadowxx789.github.io/zenscape/
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git config user.name  "zenscape-ci"
+          git config user.email "action@github.com"
+          git fetch origin gh-pages
+          WT="$RUNNER_TEMP/gh-pages-wt"
+          git worktree add "$WT" origin/gh-pages --detach
+          cd "$WT"
+          git rm -r -q assets
+          cp -R "$GITHUB_WORKSPACE/app/dist/." .
+          git add -A
+          if git diff --cached --quiet; then
+            echo "构建产物与线上一致，gh-pages 不用发"
+          else
+            n=$(git diff --cached --name-only | wc -l)
+            echo "gh-pages 变更 $n 个文件"
+            git commit -q -m "deploy: $(git -C "$GITHUB_WORKSPACE" log -1 --format='%h %s' main)"
+            git push origin HEAD:gh-pages
+            echo "等 Pages 构建…"
+            for i in $(seq 1 20); do
+              st=$(gh api "repos/shadowxx789/zenscape/pages/builds/latest" --jq .status || echo unknown)
+              case "$st" in
+                built)    echo "Pages 构建完成"; break ;;
+                errored)  echo "Pages 构建失败"; exit 1 ;;
+              esac
+              if [ "$i" = 20 ]; then echo "Pages 构建超时（5 分钟）"; exit 1; fi
+              sleep 15
+            done
+          fi
+          # 线上校验：index 引用的产物必须等于 dist
+          local_h=$(grep -o 'assets/[A-Za-z0-9._-]*' "$GITHUB_WORKSPACE/app/dist/index.html" | sort -u)
+          live_h=$(curl -fsS "$LIVE" | grep -o 'assets/[A-Za-z0-9._-]*' | sort -u)
+          if [ "$local_h" = "$live_h" ]; then
+            echo "线上 index 与 dist 一致"
+            printf '%s\n' "$live_h" | sed 's/^/  /'
+          else
+            printf '本地: %s\n线上: %s\n' "$local_h" "$live_h" >&2
+            echo "线上 index 与 dist 不一致（Pages 可能还在用旧缓存）"
+            exit 1
+          fi
