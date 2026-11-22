@@ -80,13 +80,8 @@ ab-demo/                  本地试听渲染（约 5 GB），gitignore，不要�
 
 - 只有一个工作目录，不要再建第二个 worktree 长期使用。远端分支只有 `main` 和 `gh-pages`。
 - 提交信息沿用现有前缀：`feat(audio)`、`fix(ui)`、`fix(motion)`、`docs(journey)`、`test(audio)`、`refine`、`chore` 等。
-- **推送 `main` 和部署都要先得到 Eric 同意。**
-- **合进 `main` 不会自动上线**，没有 CI。站点由 `gh-pages` 分支提供，部署方法：
-  1. 在 `main` 上 `rm -rf dist && npm run build && npm test && npm run lint`，推送 `main`。
-  2. 在临时 detached worktree 检出 `origin/gh-pages`。
-  3. **只替换构建产物**：`git rm -r assets`，再 `cp -R app/dist/. <worktree>`。不要清空整个分支，`gh-pages` 上还有 `app/`、`audio/`、`docs/`、`icons/`、`.nojekyll`。正常 diff 约 10 个文件（assets 增删、index.html、sw.js、manifest）。
-  4. 提交 `deploy: <摘要> (main <sha>)`，推 `HEAD:gh-pages`。
-  5. 等 Pages 构建完成，确认线上 `index.html` 引用的资源哈希与 `dist/assets` 一致。
+- **推送 `main` 仍要先得到 Eric 同意。**（2026-11-18 起）部署已自动化：合进 `main` 即上线，`.github/workflows/deploy.yml` 在 push 后自动跑——`app/` 下构建/测试/lint 全过，才在临时 worktree 检出 `origin/gh-pages` **只替换构建产物**（`git rm -r assets`，再 `cp -R app/dist/.` 覆盖；不要清空整个分支，`gh-pages` 上还有 `app/`、`audio/`、`docs/`、`icons/`、`.nojekyll`），提交 `deploy: <摘要> (main <sha>)` 推 `HEAD:gh-pages`，等 Pages `built` 后校验线上 `index.html` 资源哈希与 `dist/assets` 一致，不一致整run失败。产物与线上字节一致时跳过提交。
+- 部署状态看 `gh run list` / `gh run watch`。本地一键脚本（skill 里的 `deploy.sh`）只作 CI 挂掉时的应急回退，用前照旧要 Eric 同意。
 - 手机上的 PWA 可能要关掉重开一两次才更新。
 
 ## 已知坑
