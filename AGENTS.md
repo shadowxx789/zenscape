@@ -87,7 +87,7 @@ ab-demo/                  本地试听渲染（约 5 GB），gitignore，不要�
 ## 已知坑
 
 - `vite preview` 也会注册 Service Worker：重新构建后页面仍可能跑旧包。测量前先注销 SW、清缓存。
-- PWA 预缓存 `globPatterns` 目前不含 `mp3`，`dist/audio` 下的录音没有预缓存，离线开场会无声。声称「离线可用」前先查 `dist/sw.js`。
+- PWA 预缓存曾不含 `mp3`，离线开场无声——已修（`6998201`，已上线）：`app/vite.config.ts` 的 globPatterns 含 mp3 + json，`maximumFileSizeToCacheInBytes` 显式设 4 MiB（workbox 默认 2 MiB 会静默丢接近上限的文件，mp3 最大 1.6 MB），`npm run build` 末尾跑 `app/scripts/check-precache.mjs`——`dist/audio/v2` 下任何文件不在 `dist/sw.js` 里就构建失败。声称「离线可用」前看这条断言绿没绿。
 - 用 `sips` 生成的 AVIF 没有色彩标记，Chrome 下亮度约减半。用 ffmpeg libsvtav1 10-bit 并写明 bt709 / iec61966-2-1 色彩参数，再和 JPG 对比实际亮度。
 - 手机后台 / 锁屏的音频问题只在桌面验证过不算修好，要在真机上验。
 - 状态降级只靠透明度会回弹：`is-ending` 换成 `is-finished` 时过渡会把图层拉回 1。结束态要有自己的透明度规则。
