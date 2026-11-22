@@ -23,6 +23,7 @@ import type { Mode } from '../../types'
 import { planSession, type Layer, type SessionPlan, type SoundscapeManifest, type TextureSegment, type QinNote, type BellStrike } from './plan'
 import { presetFor, type Density } from './preset'
 import { newSeed } from './rng'
+import { MaterialPool } from './material'
 import { buildSpaceIR, connectTrueStereo } from './space'
 
 /** 预调度窗口。后台标签页的定时器会被节流到每秒一次甚至更慢，留 20s 余量；同时在场的节点仍只有十来个 */
@@ -127,6 +128,8 @@ export class SampleEngine {
   private streamToken = 0
   /** 诊断：渲染耗时 / 音频时长（前台、后台分开）；最小余量（已渲到 − 播放位置）；迟到段数 */
   readonly streamStats = { fgWall: 0, fgAudio: 0, bgWall: 0, bgAudio: 0, minLead: Infinity, late: 0 }
+  /** 素材驻留池：解码结果只从这里进出（按段驻留见 JOURNEY_SPEC §5.1） */
+  private readonly pool = new MaterialPool<AudioBuffer>((file) => decode(this.ctx!, file))
   setStreamMode(on: boolean): void {
     this.streamMode = on
   }
@@ -235,6 +238,7 @@ export class SampleEngine {
     this._diagnostics = null
     void this.ctx?.close()
     this.ctx = null
+    this.pool.releaseAll()
     this.buffers = null
     this.loading = null
   }
@@ -363,16 +367,38 @@ export class SampleEngine {
     if (this.buffers && this.manifest) return Promise.resolve()
     if (this.loading) return this.loading
     if (!this.ctx) this.initContext()
-    const ctx = this.ctx!
     this.loading = (async () => {
-      const M = await fetchManifest()
-      this.buffers = await decodeAll(ctx, M)
+      const M = this.manifest ?? (await fetchManifest())
+      const files = [
+        M.files.bamboo.file,
+        M.files.breeze.file,
+        M.files.water.file,
+        M.files.bell.file,
+        ...M.qin.clips.map((c) => c.file),
+      ]
+      const bufs = await this.pool.ensure(files)
+      this.buffers = {
+        bamboo: bufs.get(files[0])!,
+        breeze: bufs.get(files[1])!,
+        water: bufs.get(files[2])!,
+        bell: bufs.get(files[3])!,
+        qin: M.qin.clips.map((_, i) => bufs.get(files[4 + i])!),
+      }
       this.manifest = M
     })().catch((err) => {
       this.loading = null
       throw new Error(`声音素材加载失败：${err instanceof Error ? err.message : String(err)}`)
     })
     return this.loading
+  }
+
+  /** 素材按段驻留：离开会话视图时全部释放（≈90MB PCM 当场还给系统）。
+   *  manifest（5KB）留下；下次进会话 load() 重新解码。 */
+  unloadMaterial(): void {
+    this.stopImmediate()
+    this.pool.releaseAll()
+    this.buffers = null
+    this.loading = null
   }
 
   // ───────────────────────── 内部：图

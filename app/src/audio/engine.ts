@@ -20,6 +20,8 @@ export interface Engine {
   readonly ownsDynamics?: boolean
   /** density：疏 / 中 / 满，开始前选；缺省 = 中（定稿 C++6） */
   prepareSession?(mode: Mode, durationSec: number, density?: Density): void
+  /** 素材按段驻留（仅 v2）：离开会话视图时释放解码 PCM，≈90MB 还给系统 */
+  unloadMaterial?(): void
   play(): Promise<void>
   stop(): void
   stopImmediate(): void

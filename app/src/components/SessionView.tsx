@@ -82,6 +82,7 @@ export function SessionView({ mode, duration, density, onReturn }: SessionViewPr
     audioEngine.prepareSession?.(mode, totalSeconds, density)
     return () => {
       audioEngine.stopImmediate()
+      audioEngine.unloadMaterial?.() // 素材按段驻留：离开会话视图即释放（≈90MB PCM）
       stopNowPlaying()
     }
   }, [mode, totalSeconds, density])
