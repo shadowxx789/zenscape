@@ -26,6 +26,10 @@ html {
   background: var(--bg);
 }
 
+html[lang='en'] {
+  --font-display: Georgia, 'Times New Roman', serif;
+}
+
 body {
   min-width: 320px;
   min-height: 100svh;

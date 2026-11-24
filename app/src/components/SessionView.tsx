@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { MODE_DETAILS } from './ModeSelector'
-import { DENSITY_DETAILS } from './density'
 import { getPhase, type Phase } from '../audio/rules'
 import type { Mode } from '../types'
 import { engine as audioEngine, type Density } from '../audio/engine'
 import { ParticleCanvas } from './ParticleCanvas'
 import { LivingBackdrop } from './livingBackdrop/LivingBackdrop'
-import { pauseNowPlaying, startNowPlaying, stopNowPlaying } from '../audio/nowPlaying'
+import { pauseNowPlaying, startNowPlaying, stopNowPlaying, updateNowPlaying } from '../audio/nowPlaying'
 import sessionImage from '../assets/zen-night-valley.jpg'
 import sessionImageAvif from '../assets/zen-night-valley.avif'
+import { useI18n } from '../i18n/I18nContext'
+import { LanguageSwitcher } from '../i18n/LanguageSwitcher'
 
 const getRecentEvents = () => audioEngine.getRecentEvents()
 
@@ -39,6 +39,7 @@ function formatTime(totalSeconds: number) {
 }
 
 export function SessionView({ mode, duration, density, onReturn }: SessionViewProps) {
+  const { language, t } = useI18n()
   const totalSeconds = duration * 60
   const [remaining, setRemaining] = useState(totalSeconds)
   const [isPlaying, setIsPlaying] = useState(false)
@@ -131,21 +132,35 @@ export function SessionView({ mode, duration, density, onReturn }: SessionViewPr
       setHasStarted(true)
       setErrorMessage(null)
       // 状态栏 / 锁屏卡片；它的播放 / 暂停按钮走同一个入口
-      void startNowPlaying(`${MODE_DETAILS[mode].label} · ${duration} 分钟`, {
+      void startNowPlaying(`${t.modes.items[mode].label} · ${t.duration.minutes(duration)}`, {
         onPlay: () => void playPauseRef.current(),
         onPause: () => void playPauseRef.current(),
-      })
+      }, t.brand.name)
       await audioEngine.play()
     } catch (err) {
       stopNowPlaying()
       setIsPlaying(false)
       setHasStarted(wasStarted)
-      setErrorMessage(err instanceof Error ? err.message : '无法初始化音频，请检查浏览器设置')
+      const message = err instanceof Error ? err.message : ''
+      if (message.includes('Web Audio API')) {
+        setErrorMessage(t.session.audioUnsupported)
+      } else if (message.includes('声音素材加载失败')) {
+        setErrorMessage(t.session.audioLoadFailed)
+      } else {
+        setErrorMessage(language === 'zh' && message ? message : t.session.audioError)
+      }
     }
   }
 
   const playPauseRef = useRef(handlePlayPause)
   useEffect(() => { playPauseRef.current = handlePlayPause })
+
+  // 播放中切换语言时，只更新系统媒体卡片，不重排或重启声音。
+  useEffect(() => {
+    if (isPlaying) {
+      updateNowPlaying(`${t.modes.items[mode].label} · ${t.duration.minutes(duration)}`, t.brand.name)
+    }
+  }, [isPlaying, mode, duration, t])
 
   const handleReturn = () => {
     if (isClosing) return
@@ -171,12 +186,7 @@ export function SessionView({ mode, duration, density, onReturn }: SessionViewPr
 
   const progress = 1 - remaining / totalSeconds
   const currentPhase: Phase = getPhase(progress)
-  const phaseLabel: Record<Phase, string> = {
-    entering: '渐入',
-    settling: '安住',
-    deep: '深境',
-    returning: '回转',
-  }
+  const phaseLabel: Record<Phase, string> = t.session.phases
 
   return (
     <main
@@ -190,7 +200,7 @@ export function SessionView({ mode, duration, density, onReturn }: SessionViewPr
         isClosing && 'is-closing',
         isLive && 'has-living',
       ].filter(Boolean).join(' ')}
-      aria-label="声景会话"
+      aria-label={t.session.label}
       style={{
         '--session-bg': `url(${sessionImage})`,
         '--session-bg-set': `image-set(url(${sessionImageAvif}) type("image/avif"), url(${sessionImage}) type("image/jpeg"))`,
@@ -212,29 +222,32 @@ export function SessionView({ mode, duration, density, onReturn }: SessionViewPr
 
       <header className="session-header">
         <button type="button" className="session-return" onClick={handleReturn}>
-          <span aria-hidden="true">←</span> 离开声景
+          <span aria-hidden="true">←</span> {t.session.leave}
         </button>
-        <span className="session-wordmark">竹间息</span>
-        <span
-          className="session-phase"
-          role="status"
-          title="声景会经过 渐入 · 安住 · 深境 · 回转 四段"
-          aria-label={`当前阶段：${isFinished ? '圆满' : phaseLabel[currentPhase]}，共四段`}
-        >
-          <span className="session-phase-steps" aria-hidden="true">
-            {PHASES.map((p) => (
-              <i key={p} className={p === currentPhase || (isFinished && p === 'returning') ? 'is-now' : ''} />
-            ))}
+        <span className="session-wordmark">{t.brand.name}</span>
+        <div className="session-header-end">
+          <span
+            className="session-phase"
+            role="status"
+            title={t.session.phaseTitle}
+            aria-label={t.session.currentPhase(isFinished ? t.session.finishedPhase : phaseLabel[currentPhase])}
+          >
+            <span className="session-phase-steps" aria-hidden="true">
+              {PHASES.map((p) => (
+                <i key={p} className={p === currentPhase || (isFinished && p === 'returning') ? 'is-now' : ''} />
+              ))}
+            </span>
+            {isFinished ? t.session.finishedPhase : phaseLabel[currentPhase]}
           </span>
-          {isFinished ? '圆满' : phaseLabel[currentPhase]}
-        </span>
+          <LanguageSwitcher />
+        </div>
       </header>
 
       <section className="session-stage" aria-labelledby="session-title">
         <h1 id="session-title" className="session-title">
-          {MODE_DETAILS[mode].label}
-          <span className="session-density" aria-label={`声音：${DENSITY_DETAILS[density].short}`}>
-            {DENSITY_DETAILS[density].short}
+          {t.modes.items[mode].label}
+          <span className="session-density" aria-label={t.session.densityLabel(t.density.items[density].short)}>
+            {t.density.items[density].short}
           </span>
         </h1>
 
@@ -260,18 +273,18 @@ export function SessionView({ mode, duration, density, onReturn }: SessionViewPr
             )}
           </svg>
           <div className="orb-inner">
-            <div className="countdown" role="timer" aria-label={`剩余时间 ${formatTime(remaining)}`}>
+            <div className="countdown" role="timer" aria-label={t.session.remaining(formatTime(remaining))}>
               {formatTime(remaining)}
             </div>
           </div>
         </div>
 
         {isFinished ? (
-          <p className="session-copy">一段声景结束了。片刻仍在。</p>
+          <p className="session-copy">{t.session.finishedCopy}</p>
         ) : isPlaying ? (
-          <p className="session-copy">不必追随声音，让它自行来去。</p>
+          <p className="session-copy">{t.session.playingCopy}</p>
         ) : (
-          <p className="session-copy">按下播放，让声音慢慢醒来。</p>
+          <p className="session-copy">{t.session.pausedCopy}</p>
         )}
 
         {errorMessage && (
@@ -282,8 +295,8 @@ export function SessionView({ mode, duration, density, onReturn }: SessionViewPr
 
         {isFinished ? (
           <div className="session-actions">
-            <button type="button" className="primary-action" onClick={handleRestart}>再来一次</button>
-            <button type="button" className="ghost-action" onClick={handleReturn}>回到首页</button>
+            <button type="button" className="primary-action" onClick={handleRestart}>{t.session.restart}</button>
+            <button type="button" className="ghost-action" onClick={handleReturn}>{t.session.returnHome}</button>
           </div>
         ) : (
           <div className="session-playback">
@@ -292,7 +305,7 @@ export function SessionView({ mode, duration, density, onReturn }: SessionViewPr
               className="session-play-button"
               onClick={handlePlayPause}
               aria-pressed={isPlaying}
-              aria-label={isPlaying ? '暂停声景' : '播放声景'}
+              aria-label={isPlaying ? t.session.pauseLabel : t.session.playLabel}
             >
               {isPlaying ? (
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6v12M16 6v12" /></svg>
@@ -300,13 +313,13 @@ export function SessionView({ mode, duration, density, onReturn }: SessionViewPr
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 9 6-9 6Z" /></svg>
               )}
             </button>
-            <span className="session-play-label">{isPlaying ? '暂停' : '开始'}</span>
+            <span className="session-play-label">{isPlaying ? t.session.pause : t.session.play}</span>
           </div>
         )}
       </section>
 
       <div className="session-bottom">
-        <p className="zen-quote" aria-hidden={hasStarted && !isFinished}>竹影扫阶尘不动，月穿潭底水无痕</p>
+        <p className="zen-quote" aria-hidden={hasStarted && !isFinished}>{t.session.quote}</p>
       </div>
     </main>
   )

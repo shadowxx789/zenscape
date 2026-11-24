@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { DURATIONS } from './duration'
+import { useI18n } from '../i18n/I18nContext'
 
 export type DurationMinutes = number
 
@@ -9,6 +10,7 @@ type DurationSelectorProps = {
 }
 
 export function DurationSelector({ value, onChange }: DurationSelectorProps) {
+  const { t } = useI18n()
   const [customMode, setCustomMode] = useState(false)
   const [customValue, setCustomValue] = useState('')
 
@@ -26,10 +28,10 @@ export function DurationSelector({ value, onChange }: DurationSelectorProps) {
   return (
     <section className="selector-block duration-selector" aria-labelledby="duration-heading">
       <div className="selector-heading">
-        <h2 id="duration-heading">留多久</h2>
-        <span className="selector-note">分钟</span>
+        <h2 id="duration-heading">{t.duration.heading}</h2>
+        <span className="selector-note">{t.duration.unit}</span>
       </div>
-      <div className="option-grid duration-grid" role="radiogroup" aria-label="会话时长（分钟）">
+      <div className="option-grid duration-grid" role="radiogroup" aria-label={t.duration.groupLabel}>
         {DURATIONS.map((duration) => (
           <button
             key={duration}
@@ -41,7 +43,7 @@ export function DurationSelector({ value, onChange }: DurationSelectorProps) {
             }}
             role="radio"
             aria-checked={value === duration}
-            aria-label={`${duration} 分钟`}
+            aria-label={t.duration.minutes(duration)}
           >
             <span className="duration-value">{duration}</span>
           </button>
@@ -64,10 +66,10 @@ export function DurationSelector({ value, onChange }: DurationSelectorProps) {
               className="custom-duration-input"
               placeholder="1–180"
               autoFocus
-              aria-label="自定义时长（分钟）"
+              aria-label={t.duration.customInput}
             />
-            <button type="submit" className="custom-duration-submit" aria-label="确认自定义时长">
-              确定
+            <button type="submit" className="custom-duration-submit" aria-label={t.duration.confirmLabel}>
+              {t.duration.confirm}
             </button>
           </form>
         ) : (
@@ -77,9 +79,9 @@ export function DurationSelector({ value, onChange }: DurationSelectorProps) {
             onClick={() => setCustomMode(true)}
             role="radio"
             aria-checked={!isPreset}
-            aria-label={!isPreset ? `自定义 ${value} 分钟` : '自定义时长'}
+            aria-label={!isPreset ? t.duration.customValue(value) : t.duration.customLabel}
           >
-            <span className="duration-value">{!isPreset ? value : '自定'}</span>
+            <span className="duration-value">{!isPreset ? value : t.duration.custom}</span>
           </button>
         )}
       </div>

@@ -36,8 +36,18 @@ function quietWavUrl(): string {
 
 export type NowPlayingHandlers = { onPlay: () => void; onPause: () => void }
 
+export function updateNowPlaying(title: string, artist: string): void {
+  if (!('mediaSession' in navigator)) return
+  const icon = `${import.meta.env.BASE_URL}icons/icon-512x512.png`
+  navigator.mediaSession.metadata = new MediaMetadata({
+    title,
+    artist,
+    artwork: [{ src: icon, sizes: '512x512', type: 'image/png' }],
+  })
+}
+
 /** 在用户点播放的那一下调用（要用户手势才能 play） */
-export async function startNowPlaying(title: string, handlers: NowPlayingHandlers): Promise<void> {
+export async function startNowPlaying(title: string, handlers: NowPlayingHandlers, artist = '竹间息'): Promise<void> {
   if (!el) {
     url = quietWavUrl()
     el = new Audio(url)
@@ -49,12 +59,7 @@ export async function startNowPlaying(title: string, handlers: NowPlayingHandler
     /* 只影响状态栏，不影响发声 */
   }
   if (!('mediaSession' in navigator)) return
-  const icon = `${import.meta.env.BASE_URL}icons/icon-512x512.png`
-  navigator.mediaSession.metadata = new MediaMetadata({
-    title,
-    artist: '竹间息',
-    artwork: [{ src: icon, sizes: '512x512', type: 'image/png' }],
-  })
+  updateNowPlaying(title, artist)
   navigator.mediaSession.playbackState = 'playing'
   navigator.mediaSession.setActionHandler('play', handlers.onPlay)
   navigator.mediaSession.setActionHandler('pause', handlers.onPause)

@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 import { DurationSelector } from './components/DurationSelector'
-import { MODE_DETAILS, ModeSelector } from './components/ModeSelector'
+import { ModeSelector } from './components/ModeSelector'
 import { DensitySelector } from './components/DensitySelector'
-import { DENSITY_DETAILS } from './components/density'
 import { SessionView } from './components/SessionView'
 import type { Density } from './audio/engine'
 import type { Mode } from './types'
@@ -15,6 +14,9 @@ import './App.css'
 import { DiagnosticsPanel } from './components/DiagnosticsPanel'
 import { SoundCredits } from './components/SoundCredits'
 import { LivingBackdrop } from './components/livingBackdrop/LivingBackdrop'
+import { useI18n } from './i18n/I18nContext'
+import { LanguageSwitcher } from './i18n/LanguageSwitcher'
+import { LanguagePrompt } from './i18n/LanguagePrompt'
 
 /** 读首页 <img> 实际用的图和 object-position，让动态层与静态层完全对齐 */
 const homeImg = () => document.querySelector<HTMLImageElement>('.home-landscape')
@@ -36,6 +38,7 @@ const ENTER_MS = 900
 const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
 
 function App() {
+  const { t } = useI18n()
   const [mode, setMode] = useState<Mode>(saved.mode)
   const [duration, setDuration] = useState(saved.duration)
   const [density, setDensity] = useState<Density>(saved.density)
@@ -88,35 +91,38 @@ function App() {
           <div className="home-veil" aria-hidden="true" />
 
           <header className="home-header">
-            <div className="brand-lockup" aria-label="竹间息 BreezeScape">
-              <span className="brand-name">竹间息</span>
-              <span className="brand-sub">BREEZESCAPE</span>
+            <div className="brand-lockup" aria-label={t.brand.aria}>
+              <span className="brand-name">{t.brand.name}</span>
+              <span className="brand-sub">{t.brand.sub}</span>
             </div>
-            <p className="header-note">生成式冥想声景</p>
+            <div className="header-tools">
+              <p className="header-note">{t.brand.note}</p>
+              <LanguageSwitcher />
+            </div>
           </header>
 
           <div className="home-layout">
             <section className="hero-panel" aria-labelledby="app-title">
               <div className="hero-content">
-                <p className="section-kicker">风过竹林 · 水落石间</p>
-                <h1 id="app-title">且坐，<br />听风。</h1>
+                <p className="section-kicker">{t.home.kicker}</p>
+                <h1 id="app-title">{t.home.titleFirst}<br />{t.home.titleSecond}</h1>
                 <p className="hero-copy">
-                  <span className="nowrap">风、水、钟与古琴，</span><span className="nowrap">慢慢生成一片不重复的声景。</span><br />
-                  <span className="nowrap">不必做什么，</span><span className="nowrap">只要在这里。</span>
+                  <span className="nowrap">{t.home.copyFirstA}</span><span className="nowrap">{t.home.copyFirstB}</span><br />
+                  <span className="nowrap">{t.home.copySecondA}</span><span className="nowrap">{t.home.copySecondB}</span>
                 </p>
               </div>
             </section>
 
-            <section className="setup-panel" aria-label="声景设置">
+            <section className="setup-panel" aria-label={t.home.setupLabel}>
               <ModeSelector value={mode} onChange={setMode} />
               <DurationSelector value={duration} onChange={setDuration} />
               <DensitySelector value={density} onChange={setDensity} />
 
               <div className="home-actions">
                 <button type="button" className="start-button" onClick={handleEnter}>
-                  <span>进入声景</span>
+                  <span>{t.home.start}</span>
                   <span className="start-meta">
-                    {MODE_DETAILS[mode].label} · {duration} 分钟 · {DENSITY_DETAILS[density].label}
+                    {t.modes.items[mode].label} · {t.duration.minutes(duration)} · {t.density.items[density].label}
                   </span>
                 </button>
                 <button
@@ -126,7 +132,7 @@ function App() {
                   aria-hidden={isDefault}
                   tabIndex={isDefault ? -1 : 0}
                 >
-                  恢复默认
+                  {t.home.reset}
                 </button>
               </div>
             </section>
@@ -138,6 +144,7 @@ function App() {
         </main>
       )}
       <DiagnosticsPanel />
+      <LanguagePrompt />
     </>
   )
 }
